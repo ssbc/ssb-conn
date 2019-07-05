@@ -82,7 +82,6 @@ export class ConnScheduler {
   private lastMessageAt: number;
   private hasScheduledAnUpdate: boolean;
   private hops: Record<FeedId, number>;
-  private stopTrackingHops: any;
 
   constructor(ssb: any, config: any) {
     this.ssb = ssb;
@@ -94,31 +93,26 @@ export class ConnScheduler {
     this.lastMessageAt = 0;
     this.hasScheduledAnUpdate = false;
     this.hops = {};
-    this.stopTrackingHops = null;
 
     this.ssb.post((msg: Msg) => {
       if (msg.value.author != this.ssb.id) {
         this.lastMessageAt = Date.now();
       }
+      if (msg.value.content && msg.value.content.type === 'contact') {
+        this.updateHops();
+      }
     });
   }
 
-  private trackHops() {
+  private updateHops() {
     if (this.ssb.friends && this.ssb.friends.hops) {
-      const updateHops = () => {
-        return this.ssb.friends.hops(
-          (err: any, hops: Record<FeedId, number>) => {
-            if (err) {
-              debug('unable to call ssb.friends.hops: %s', err);
-              return;
-            }
-            this.hops = hops;
-          },
-        );
-      };
-
-      updateHops();
-      this.stopTrackingHops = this.ssb.friends.onEdge(updateHops);
+      this.ssb.friends.hops((err: any, hops: Record<FeedId, number>) => {
+        if (err) {
+          debug('unable to call ssb.friends.hops: %s', err);
+          return;
+        }
+        this.hops = hops;
+      });
     }
   }
 
@@ -330,7 +324,7 @@ export class ConnScheduler {
     this.closed = false;
 
     // Upon init, load some follow-and-blocks data
-    this.trackHops();
+    this.updateHops();
 
     // Upon init, purge some undesired DB entries
     for (let [address, {source, type}] of this.db.entries()) {
@@ -382,7 +376,6 @@ export class ConnScheduler {
   @muxrpc('sync')
   public stop = () => {
     this.hub.reset();
-    if (this.stopTrackingHops) this.stopTrackingHops();
     this.closed = true;
   };
 }
