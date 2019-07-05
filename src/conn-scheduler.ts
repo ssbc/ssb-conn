@@ -5,6 +5,7 @@ import {ListenEvent as HubEvent} from 'ssb-conn-hub/lib/types';
 import {Peer} from 'ssb-conn-query/lib/types';
 import {Msg} from 'ssb-typescript';
 import {plugin, muxrpc} from 'secret-stack-decorators';
+import {CONN} from './conn';
 const pull = require('pull-stream');
 const ip = require('ip');
 const onWakeup = require('on-wakeup');
@@ -14,16 +15,6 @@ const ref = require('ssb-ref');
 require('zii');
 
 function noop() {}
-
-function not(fn: Function) {
-  return function(e: any) {
-    return !fn(e);
-  };
-}
-
-function and(...args: Array<any>) {
-  return (value: any) => args.every((fn: Function) => fn.call(null, value));
-}
 
 let lastCheck = 0;
 let lastValue: any = null;
@@ -42,11 +33,11 @@ function isOffline(p: Peer) {
   else return !hasNetworkDebounced();
 }
 
+const canBeConnected = (p: Peer) => !isOffline(p);
+
 function notBluetooth(p: Peer) {
   return !p[0].startsWith('bt:');
 }
-
-const canBeConnected = not(isOffline);
 
 function isLocal(p: Peer): boolean {
   // don't rely on private ip address, because
@@ -66,10 +57,6 @@ function isLegacy(peer: Peer): boolean {
   return hasSuccessfulAttempts(peer) && !hasPinged(peer);
 }
 
-function isFriend(p: Peer): boolean {
-  return p[1].source === 'friends';
-}
-
 function take(n: number) {
   return <T>(arr: Array<T>) => arr.slice(0, Math.max(n, 0));
 }
@@ -86,6 +73,8 @@ const {
 
 const minute = 60e3;
 const hour = 60 * 60e3;
+
+type BTPeer = {remoteAddress: string; id: string; displayName: string};
 
 @plugin('1.0.0')
 export class ConnScheduler {
@@ -138,14 +127,15 @@ export class ConnScheduler {
 
     // Disconnect from excess
     peersUp
-      .filter(notBluetooth)
+      .filter(notBluetooth) // TODO remove this?
       .z(sortByStateChange)
       .z(take(excess))
       .forEach(([addr]) => this.hub.disconnect(addr).then(noop, noop));
 
     // Connect to suitable candidates
     peersDown
-      .filter(notBluetooth)
+      // TODO .filter(notBlocked)
+      .filter(notBluetooth) // TODO remove this?
       .filter(canBeConnected)
       .z(passesGroupDebounce(groupMin))
       .filter(passesExpBackoff(backoffStep, backoffMax))
@@ -158,22 +148,6 @@ export class ConnScheduler {
     // Respect some limits: don't attempt to connect while migration is running
     if (!this.ssb.ready() || this.isCurrentlyDownloading()) return;
 
-    const numOfConnectedRemoteNonFriends = this.query
-      .peersInConnection()
-      .filter(and(not(isLocal), not(isFriend))).length;
-
-    const numOfConnectedFriends = this.query
-      .peersInConnection()
-      .filter(isFriend).length;
-
-    if (this.conf('friends', true))
-      this.updateTheseConnections(isFriend, {
-        quota: 3,
-        backoffStep: 2e3,
-        backoffMax: 10 * minute,
-        groupMin: 1e3,
-      });
-
     if (this.conf('seed', true))
       this.updateTheseConnections(p => p[1].source === 'seed', {
         quota: 3,
@@ -182,73 +156,53 @@ export class ConnScheduler {
         groupMin: 1e3,
       });
 
-    if (this.conf('local', true))
-      this.updateTheseConnections(isLocal, {
-        quota: 3,
-        backoffStep: 2e3,
-        backoffMax: 10 * minute,
-        groupMin: 1e3,
-      });
+    // TODO autoconnect to local ONLY if we are following them
+    // if (this.conf('local', true))
+    //   this.updateTheseConnections(isLocal, {
+    //     quota: 3,
+    //     backoffStep: 2e3,
+    //     backoffMax: 10 * minute,
+    //     groupMin: 1e3,
+    //   });
 
-    if (this.conf('global', true)) {
-      // prioritize friends
-      this.updateTheseConnections(and(isFriend, hasPinged), {
-        quota: 2,
-        backoffStep: 10e3,
-        backoffMax: 10 * minute,
-        groupMin: 5e3,
-      });
+    // prioritize friends
+    this.updateTheseConnections(hasPinged, {
+      quota: 2,
+      backoffStep: 10e3,
+      backoffMax: 10 * minute,
+      groupMin: 5e3,
+    });
 
-      if (numOfConnectedFriends < 2) {
-        this.updateTheseConnections(and(isFriend, hasNoAttempts), {
-          quota: 1,
-          backoffStep: 0,
-          backoffMax: 0,
-          groupMin: 0,
-        });
-      }
+    this.updateTheseConnections(hasNoAttempts, {
+      quota: 2,
+      backoffStep: 30e3,
+      backoffMax: 30 * minute,
+      groupMin: 15e3,
+    });
 
-      this.updateTheseConnections(and(isFriend, hasOnlyFailedAttempts), {
-        quota: 3,
-        backoffStep: minute,
-        backoffMax: 3 * hour,
-        groupMin: 5 * minute,
-      });
+    this.updateTheseConnections(hasOnlyFailedAttempts, {
+      quota: 3,
+      backoffStep: 1 * minute,
+      backoffMax: 3 * hour,
+      groupMin: 5 * minute,
+    });
 
-      // standard longterm peers
-      this.updateTheseConnections(and(hasPinged, not(isFriend), not(isLocal)), {
-        quota: 2,
-        backoffStep: 10e3,
-        backoffMax: 10 * minute,
-        groupMin: 5e3,
-      });
+    this.updateTheseConnections(isLegacy, {
+      quota: 1,
+      backoffStep: 4 * minute,
+      backoffMax: 3 * hour,
+      groupMin: 5 * minute,
+    });
 
-      if (numOfConnectedRemoteNonFriends === 0) {
-        this.updateTheseConnections(hasNoAttempts, {
-          quota: 1,
-          backoffStep: 0,
-          backoffMax: 0,
-          groupMin: 0,
-        });
-      }
+    // Purge some old staged peers
+    this.query
+      .peersConnectable('staging')
+      // TODO replace this with the field staged[1].ephemeral (boolean)
+      .filter(staged => staged[1].type === 'bt' || staged[1].type === 'lan')
+      .filter(staged => staged[1].stagingUpdated! + 30e3 < Date.now())
+      .forEach(([addr]) => (this.ssb.conn as CONN).unstage(addr));
 
-      //quota, groupMin, min, backoffStep, max
-      this.updateTheseConnections(hasOnlyFailedAttempts, {
-        quota: 3,
-        backoffStep: 5 * minute,
-        backoffMax: 3 * hour,
-        groupMin: 5 * 50e3,
-      });
-
-      const longterm = this.query.peersInConnection().filter(hasPinged).length;
-
-      this.updateTheseConnections(isLegacy, {
-        quota: 3 - longterm,
-        backoffStep: 5 * minute,
-        backoffMax: 3 * hour,
-        groupMin: 5 * minute,
-      });
-    }
+    // TODO for all connected peers, filter for blocked ones, and disconnect
 
     // Purge some ongoing frustrating connection attempts
     this.query
@@ -273,10 +227,94 @@ export class ConnScheduler {
     if (timer.unref) timer.unref();
   }
 
+  private populateWithSeeds() {
+    // Populate gossip table with configured seeds (mainly used in testing)
+    const seeds = this.config.seeds;
+    (Array.isArray(seeds) ? seeds : [seeds]).filter(Boolean).forEach(addr => {
+      this.ssb.gossip.add(addr, 'seed');
+    });
+  }
+
+  private setupPubDiscovery() {
+    // Populate gossip table with pub announcements on the feed
+    // (allow this to be disabled via config)
+    if (
+      !this.config.gossip ||
+      (this.config.gossip.autoPopulate !== false &&
+        this.config.gossip.pub !== false)
+    ) {
+      type PubContent = {address?: string};
+      pull(
+        this.ssb.messagesByType({type: 'pub', live: true, keys: false}),
+        pull.filter((msg: any) => !msg.sync),
+        pull.filter(
+          (msg: Msg<PubContent>['value']) =>
+            msg.content &&
+            msg.content.address &&
+            ref.isAddress(msg.content.address),
+        ),
+        pull.drain(
+          (msg: Msg<PubContent>['value']) => {
+            this.ssb.gossip.add(msg.content.address, 'pub');
+          },
+          (...args: Array<any>) => {
+            console.warn(
+              '[gossip] warning: this can happen if the database closes',
+              args,
+            );
+          },
+        ),
+      );
+    }
+  }
+
+  private setupBluetoothDiscovery() {
+    if (this.ssb.bluetooth && this.ssb.bluetooth.nearbyScuttlebuttDevices) {
+      pull(
+        this.ssb.bluetooth.nearbyScuttlebuttDevices(1000),
+        pull.drain(({discovered}: {discovered: Array<BTPeer>}) => {
+          for (const btPeer of discovered) {
+            const address =
+              `bt:${btPeer.remoteAddress.split(':').join('')}` +
+              '~' +
+              `shs:${btPeer.id.replace(/^\@/, '').replace(/\.ed25519$/, '')}`;
+
+            (this.ssb.conn as CONN).stage(address, {
+              type: 'bt',
+              note: btPeer.displayName,
+              key: btPeer.id,
+            });
+
+            // TODO after some seconds or minutes, unstage each one
+          }
+        }),
+      );
+    }
+  }
+
   @muxrpc('sync')
   public start = () => {
     if (!this.closed) return;
     this.closed = false;
+
+    // Upon init, purge some undesired DB entries
+    for (let [address, {source, type}] of this.db.entries()) {
+      if (
+        source === 'local' ||
+        source === 'bt' ||
+        type === 'lan' ||
+        type === 'bt'
+      ) {
+        (this.ssb.conn as CONN).forget(address);
+      }
+    }
+
+    // Upon init, attempt to make some connections
+    this.updateConnectionsSoon();
+
+    // Upon regular time intervals, attempt to make connections
+    const int = setInterval(() => this.updateConnectionsSoon(), 2e3);
+    if (int.unref) int.unref();
 
     // Upon wakeup, trigger hard reconnect
     onWakeup(() => this.hub.reset());
@@ -298,63 +336,12 @@ export class ConnScheduler {
       ),
     );
 
-    // Upon regular time intervals, attempt to make connections
-    const int = setInterval(() => this.updateConnectionsSoon(), 2e3);
-    if (int.unref) int.unref();
+    // Upon init, populate with seeds
+    this.populateWithSeeds();
 
-    // Upon init, attempt to make some connections
-    this.updateConnectionsSoon();
-
-    // Upon init, populate with seeds and pubs
-    if (this.config.offline) {
-      console.log('Running in offline mode: gossip disabled');
-    } else {
-      // Populate gossip table with configured seeds (mainly used in testing)
-      const seeds = this.config.seeds;
-      (Array.isArray(seeds) ? seeds : [seeds]).filter(Boolean).forEach(addr => {
-        this.ssb.gossip.add(addr, 'seed');
-      });
-
-      // Populate gossip table with pub announcements on the feed
-      // (allow this to be disabled via config)
-      if (
-        !this.config.gossip ||
-        (this.config.gossip.autoPopulate !== false &&
-          this.config.gossip.pub !== false)
-      ) {
-        type PubContent = {address?: string};
-        pull(
-          this.ssb.messagesByType({type: 'pub', live: true, keys: false}),
-          pull.filter((msg: any) => !msg.sync),
-          pull.filter(
-            (msg: Msg<PubContent>['value']) =>
-              msg.content &&
-              msg.content.address &&
-              ref.isAddress(msg.content.address),
-          ),
-          pull.drain(
-            (msg: Msg<PubContent>['value']) => {
-              this.ssb.gossip.add(msg.content.address, 'pub');
-            },
-            (...args: Array<any>) => {
-              console.warn(
-                '[gossip] warning: this can happen if the database closes',
-                args,
-              );
-            },
-          ),
-        );
-      }
-    }
-
-    // Upon init, populate gossip table from the database
-    for (let [address, data] of this.db.entries()) {
-      if (data.source === 'dht') {
-        this.ssb.gossip.add(address, 'dht');
-      } else if (data.source !== 'local' && data.source !== 'bt') {
-        this.ssb.gossip.add(address, 'stored');
-      }
-    }
+    // Upon init, setup discovery via various modes
+    this.setupPubDiscovery();
+    this.setupBluetoothDiscovery();
   };
 
   @muxrpc('sync')
