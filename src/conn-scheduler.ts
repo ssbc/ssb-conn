@@ -34,10 +34,6 @@ function isOffline(p: Peer) {
 
 const canBeConnected = (p: Peer) => !isOffline(p);
 
-function notBluetooth(p: Peer) {
-  return !p[0].startsWith('bt:');
-}
-
 function isLocal(p: Peer): boolean {
   // don't rely on private ip address, because
   // cjdns creates fake private ip addresses.
@@ -152,14 +148,13 @@ export class ConnScheduler {
   // opts: { quota, backoffStep, backoffMax, groupMin }
   private updateTheseConnections(test: (p: Peer) => boolean, opts: any) {
     const peersUp = this.query.peersInConnection().filter(test);
-    const peersDown = this.query.peersConnectable('dbAndStaging').filter(test);
+    const peersDown = this.query.peersConnectable('db').filter(test);
     const {quota, backoffStep, backoffMax, groupMin} = opts;
     const excess = peersUp.length > quota * 2 ? peersUp.length - quota : 0;
     const freeSlots = Math.max(quota - peersUp.length, 0);
 
     // Disconnect from excess
     peersUp
-      .filter(notBluetooth) // TODO remove this?
       .z(sortByStateChange)
       .z(take(excess))
       .forEach(([addr]) => this.hub.disconnect(addr));
@@ -167,7 +162,6 @@ export class ConnScheduler {
     // Connect to suitable candidates
     peersDown
       .filter(p => !this.weBlockThem(p))
-      .filter(notBluetooth) // TODO remove this?
       .filter(canBeConnected)
       .z(passesGroupDebounce(groupMin))
       .filter(passesExpBackoff(backoffStep, backoffMax))
