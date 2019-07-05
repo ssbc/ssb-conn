@@ -28,7 +28,6 @@ export type Peer = {
     fail?: any;
   };
   disconnect?: Function;
-  announcers?: number;
 };
 
 export type Callback<T> = (err?: any, val?: T) => void;

@@ -7,8 +7,6 @@ import {plugin, muxrpc} from 'secret-stack-decorators';
 const pull = require('pull-stream');
 const Notify = require('pull-notify');
 const ref = require('ssb-ref');
-const fs = require('fs');
-const path = require('path');
 
 function isPeerObject(o: any): o is Peer {
   return o && 'object' == typeof o;
@@ -26,12 +24,6 @@ function toAddressString(address: Peer | string): string {
       return (
         ['dht', address.host].join(':') + '~' + 'noauth'
         // ['shs', toBase64(address.key)].join(':')
-      );
-    } else if (address.source === 'bt') {
-      return (
-        ['bt', address.host].join(':') +
-        '~' +
-        ['shs', toBase64(address.key)].join(':')
       );
     }
     let protocol = 'net';
@@ -73,22 +65,6 @@ function parseAddress(address: string) {
   }
 }
 
-function simplifyPeerForStatus(peer: Peer) {
-  return {
-    address: peer.address || toAddressString(peer),
-    source: peer.source,
-    state: peer.state,
-    stateChange: peer.stateChange,
-    failure: peer.failure,
-    client: peer.client,
-    stats: {
-      duration: peer.duration || undefined,
-      rtt: peer.ping ? peer.ping.rtt : undefined,
-      skew: peer.ping ? peer.ping.skew : undefined,
-    },
-  };
-}
-
 function validateAddr(addr: Peer | string): [string, any] {
   if (!addr || (typeof addr !== 'object' && typeof addr !== 'string')) {
     throw new Error('address should be an object or string');
@@ -102,94 +78,37 @@ function validateAddr(addr: Peer | string): [string, any] {
 
 function inferSource(address: string): Peer['source'] {
   // We ASSUME this `address` is NOT in conn-db and is NOT a pub
-  return address.startsWith('net:')
-    ? 'local'
-    : address.startsWith('bt:')
-    ? 'bt'
-    : 'manual';
+  return address.startsWith('net:') ? 'local' : 'manual';
 }
 
 @plugin('1.0.0')
 export class Gossip {
-  public wakeup: number;
   private readonly ssb: any;
-  private readonly config: any;
-  private readonly status: Record<string, Peer>;
   private readonly notify: any;
   private readonly connDB: ConnDB;
   private readonly connHub: ConnHub;
   private readonly connStaging: ConnStaging;
 
-  constructor(ssb: any, cfg: any) {
+  constructor(ssb: any) {
     this.ssb = ssb;
-    this.config = cfg;
-    this.wakeup = 0;
-    this.status = {};
     this.notify = Notify();
     this.connDB = this.ssb.conn.internalConnDb();
     this.connHub = this.ssb.conn.internalConnHub();
     this.connStaging = this.ssb.conn.internalConnStaging();
 
-    this.setupStatusHook();
     this.setupConnectionListeners();
     this.ssb.conn.start();
-  }
-
-  /**
-   * Add peer metadata (for all peers) to the ssb-server status API
-   */
-  private setupStatusHook() {
-    const connDB = this.connDB;
-    const connHub = this.connHub;
-    const status = this.status;
-    this.ssb.status.hook(function(fn: Function) {
-      const _status = fn();
-      _status.gossip = status;
-      for (let [address, data] of connDB.entries()) {
-        const state = connHub.getState(address);
-        if (state === 'connected' || data.stateChange! + 3e3 > Date.now()) {
-          if (data.key) {
-            status[data.key] = simplifyPeerForStatus({...(data as any), state});
-          }
-        }
-      }
-      return _status;
-    });
   }
 
   private setupConnectionListeners() {
     pull(
       this.connHub.listen(),
       pull.drain((ev: HubEvent) => {
-        if (ev.type === 'connecting') this.onConnecting(ev);
         if (ev.type === 'connecting-failed') this.onConnectingFailed(ev);
         if (ev.type === 'connected') this.onConnected(ev);
-        if (ev.type === 'disconnecting') this.onDisconnecting(ev);
-        if (ev.type === 'disconnecting-failed') this.onDisconnectingFailed(ev);
         if (ev.type === 'disconnected') this.onDisconnected(ev);
       }),
     );
-  }
-
-  // Only used by enable/disable
-  private setConfig(name: string, value: any) {
-    // Update in-memory config
-    this.config.gossip = this.config.gossip || {};
-    this.config.gossip[name] = value;
-
-    // Update file system config
-    const cfgPath = path.join(this.config.path, 'config');
-    let configInFS: any = {};
-    try {
-      configInFS = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
-    } catch (e) {}
-    configInFS.gossip = configInFS.gossip || {};
-    configInFS.gossip[name] = value;
-    fs.writeFileSync(cfgPath, JSON.stringify(configInFS, null, 2), 'utf-8');
-  }
-
-  private onConnecting(ev: HubEvent) {
-    this.ssb.emit('log:info', ['ssb-server', ev.address, 'CONNECTING']);
   }
 
   private onConnectingFailed(ev: HubEvent) {
@@ -200,8 +119,6 @@ export class Gossip {
       ...this.connDB.get(ev.address),
     };
     this.notify({type: 'connect-failure', peer});
-    const err = (ev.details && ev.details.message) || ev.details;
-    this.ssb.emit('log:info', ['ssb-server', ev.address, 'ERR', err]);
   }
 
   private onConnected(ev: HubEvent) {
@@ -212,19 +129,7 @@ export class Gossip {
       ...this.connDB.get(ev.address),
     } as Peer;
     if (!this.connDB.has(ev.address)) peer.source = inferSource(ev.address);
-    if (ev.key) {
-      this.status[ev.key] = simplifyPeerForStatus(peer);
-    }
-    this.ssb.emit('log:info', ['ssb-server', ev.address, 'PEER JOINED']);
     this.notify({type: 'connect', peer});
-  }
-
-  private onDisconnecting(_ev: HubEvent) {
-    // Already handled by CONN
-  }
-
-  private onDisconnectingFailed(_ev: HubEvent) {
-    // ssb-gossip does not handle this case
   }
 
   private onDisconnected(ev: HubEvent) {
@@ -234,20 +139,6 @@ export class Gossip {
       key: ev.key,
       ...this.connDB.get(ev.address),
     } as Peer;
-    if (ev.key) {
-      delete this.status[ev.key];
-    }
-    this.ssb.emit('log:info', [
-      'ssb-server',
-      ev.address,
-      [
-        'DISCONNECTED. state was',
-        peer.state,
-        'for',
-        (Date.now() - peer.stateChange!) / 1000,
-        'seconds',
-      ].join(' '),
-    ]);
     this.notify({type: 'disconnect', peer});
   }
 
@@ -261,6 +152,7 @@ export class Gossip {
 
   @muxrpc('sync')
   public peers = () => {
+    console.error('DEPRECATED gossip.peers() was called. Use ssb-conn instead');
     const peers = Array.from(this.connDB.entries()).map(([address, data]) => {
       return {
         ...data,
@@ -289,6 +181,7 @@ export class Gossip {
   // but it's still used in tests and it's in the manifest
   @muxrpc('sync')
   public get = (addr: Peer | string) => {
+    console.error('DEPRECATED gossip.get() was called. Use ssb-conn instead');
     if (ref.isFeed(addr)) {
       for (let [address, data] of this.connDB.entries()) {
         if (data.key === addr) {
@@ -311,6 +204,9 @@ export class Gossip {
 
   @muxrpc('async')
   public connect = (addr: Peer | string, cb: Callback<any>) => {
+    console.error(
+      'DEPRECATED gossip.connect() was called. Use ssb-conn instead',
+    );
     let addressString: string;
     try {
       const inputAddr = ref.isFeed(addr) ? this.idToAddr(addr) : addr;
@@ -326,6 +222,9 @@ export class Gossip {
 
   @muxrpc('async')
   public disconnect = (addr: Peer | string, cb: any) => {
+    console.error(
+      'DEPRECATED gossip.disconnect() was called. Use ssb-conn instead',
+    );
     let addressString: string;
     try {
       const inputAddr = ref.isFeed(addr) ? this.idToAddr(addr) : addr;
@@ -339,11 +238,15 @@ export class Gossip {
 
   @muxrpc('source')
   public changes = () => {
+    console.error(
+      'DEPRECATED gossip.changes() was called. Use ssb-conn instead',
+    );
     return this.notify.listen();
   };
 
   @muxrpc('sync')
   public add = (addr: Peer | string, source: Peer['source']) => {
+    console.error('DEPRECATED gossip.add() was called. Use ssb-conn instead');
     const [addressString, parsed] = validateAddr(addr);
     if (parsed.key === this.ssb.id) return;
 
@@ -354,7 +257,6 @@ export class Gossip {
         port: parsed.port,
         key: parsed.key,
         address: addressString,
-        announcers: 1,
         duration: 0,
       });
       this.notify({
@@ -369,15 +271,15 @@ export class Gossip {
       return parsed;
     }
 
-    const existingPeer = this.connDB.get(addressString);
-    if (!existingPeer) {
+    if (this.connDB.has(addressString)) {
+      return this.connDB.get(addressString);
+    } else {
       this.connDB.set(addressString, {
         host: parsed.host,
         port: parsed.port,
         key: parsed.key,
         address: addressString,
         source: source,
-        announcers: 1,
       });
       this.notify({
         type: 'discover',
@@ -389,24 +291,16 @@ export class Gossip {
         source: source || 'manual',
       });
       return this.connDB.get(addressString) || parsed;
-    } else {
-      // Upgrade the priority to friend
-      if (source === 'friends') {
-        this.connDB.update(addressString, {source});
-      } else {
-        this.connDB.update(addressString, (prev: any) => ({
-          announcers: prev.announcers + 1,
-        }));
-      }
-      return this.connDB.get(addressString);
     }
   };
 
   @muxrpc('sync')
   public remove = (addr: Peer | string) => {
+    console.error(
+      'DEPRECATED gossip.remove() was called. Use ssb-conn instead',
+    );
     const [addressString] = validateAddr(addr);
 
-    // TODO are we sure that connHub.disconnect() mirrors ssb-gossip?
     this.connHub.disconnect(addressString);
     this.connStaging.unstage(addressString);
 
@@ -421,32 +315,19 @@ export class Gossip {
 
   @muxrpc('sync')
   public reconnect = () => {
+    console.error(
+      'DEPRECATED gossip.reconnect() was called. Use ssb-conn instead',
+    );
     this.connHub.reset();
-    return (this.wakeup = Date.now());
   };
 
   @muxrpc('sync')
   public enable = (type: string) => {
-    if (!!type && typeof type !== 'string') {
-      throw new Error('enable() expects an optional string as argument');
-    }
-
-    const actualType = type || 'global';
-    this.setConfig(actualType, true);
-    if (actualType === 'local' && this.ssb.local && this.ssb.local.init) {
-      this.ssb.local.init();
-    }
-    return 'enabled gossip type ' + actualType;
+    console.error('UNSUPPORTED gossip.enable("' + type + '") was ignored');
   };
 
   @muxrpc('sync')
   public disable = (type: string) => {
-    if (!!type && typeof type !== 'string') {
-      throw new Error('disable() expects an optional string as argument');
-    }
-
-    const actualType = type || 'global';
-    this.setConfig(actualType, false);
-    return 'disabled gossip type ' + actualType;
+    console.error('UNSUPPORTED gossip.disable("' + type + '") was ignored');
   };
 }
