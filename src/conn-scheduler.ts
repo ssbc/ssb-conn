@@ -3,7 +3,7 @@ import ConnHub = require('ssb-conn-hub');
 import ConnQuery = require('ssb-conn-query');
 import {ListenEvent as HubEvent} from 'ssb-conn-hub/lib/types';
 import {Peer} from 'ssb-conn-query/lib/types';
-import {Msg} from 'ssb-typescript';
+import {Msg, FeedId} from 'ssb-typescript';
 import {plugin, muxrpc} from 'secret-stack-decorators';
 import {CONN} from './conn';
 const pull = require('pull-stream');
@@ -12,6 +12,7 @@ const onWakeup = require('on-wakeup');
 const onNetwork = require('on-change-network');
 const hasNetwork = require('has-network');
 const ref = require('ssb-ref');
+const debug = require('debug')('ssb:conn:scheduler');
 require('zii');
 
 let lastCheck = 0;
@@ -84,6 +85,8 @@ export class ConnScheduler {
   private closed: boolean;
   private lastMessageAt: number;
   private hasScheduledAnUpdate: boolean;
+  private hops: Record<FeedId, number>;
+  private stopTrackingHops: any;
 
   constructor(ssb: any, config: any) {
     this.ssb = ssb;
@@ -94,12 +97,33 @@ export class ConnScheduler {
     this.closed = true;
     this.lastMessageAt = 0;
     this.hasScheduledAnUpdate = false;
+    this.hops = {};
+    this.stopTrackingHops = null;
 
     this.ssb.post((msg: Msg) => {
       if (msg.value.author != this.ssb.id) {
         this.lastMessageAt = Date.now();
       }
     });
+  }
+
+  private trackHops() {
+    if (this.ssb.friends && this.ssb.friends.hops) {
+      const updateHops = () => {
+        return this.ssb.friends.hops(
+          (err: any, hops: Record<FeedId, number>) => {
+            if (err) {
+              debug('unable to call ssb.friends.hops: %s', err);
+              return;
+            }
+            this.hops = hops;
+          },
+        );
+      };
+
+      updateHops();
+      this.stopTrackingHops = this.ssb.friends.onEdge(updateHops);
+    }
   }
 
   // Utility to pick from config, with some defaults
@@ -112,6 +136,16 @@ export class ConnScheduler {
   private isCurrentlyDownloading() {
     // don't schedule gossip if currently downloading messages
     return this.lastMessageAt && this.lastMessageAt > Date.now() - 500;
+  }
+
+  private weBlockThem([_addr, data]: Peer) {
+    if (!data || !data.key) return false;
+    return this.hops[data.key] === -1;
+  }
+
+  private weFollowThem([_addr, data]: Peer) {
+    if (!data || !data.key) return false;
+    return this.hops[data.key] > 0;
   }
 
   // Utility to connect to bunch of peers, or disconnect if over quota
@@ -132,7 +166,7 @@ export class ConnScheduler {
 
     // Connect to suitable candidates
     peersDown
-      // TODO .filter(notBlocked)
+      .filter(p => !this.weBlockThem(p))
       .filter(notBluetooth) // TODO remove this?
       .filter(canBeConnected)
       .z(passesGroupDebounce(groupMin))
@@ -183,6 +217,19 @@ export class ConnScheduler {
       groupMin: 5 * minute,
     });
 
+    // Automatically connect to (five) staged peers we follow
+    this.query
+      .peersConnectable('staging')
+      .filter(p => this.weFollowThem(p))
+      .z(take(5))
+      .forEach(([addr, data]) => this.hub.connect(addr, data));
+
+    // Purge connected peers that are now blocked
+    this.query
+      .peersInConnection()
+      .filter(p => this.weBlockThem(p))
+      .forEach(([addr]) => this.hub.disconnect(addr));
+
     // Purge some old staged LAN peers
     this.query
       .peersConnectable('staging')
@@ -196,8 +243,6 @@ export class ConnScheduler {
       .filter(staged => staged[1].type === 'bt')
       .filter(staged => staged[1].stagingUpdated! + 30e3 < Date.now())
       .forEach(([addr]) => (this.ssb.conn as CONN).unstage(addr));
-
-    // TODO for all connected peers, filter for blocked ones, and disconnect
 
     // Purge some ongoing frustrating connection attempts
     this.query
@@ -290,6 +335,9 @@ export class ConnScheduler {
     if (!this.closed) return;
     this.closed = false;
 
+    // Upon init, load some follow-and-blocks data
+    this.trackHops();
+
     // Upon init, purge some undesired DB entries
     for (let [address, {source, type}] of this.db.entries()) {
       if (
@@ -340,6 +388,7 @@ export class ConnScheduler {
   @muxrpc('sync')
   public stop = () => {
     this.hub.reset();
+    if (this.stopTrackingHops) this.stopTrackingHops();
     this.closed = true;
   };
 }
