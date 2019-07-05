@@ -14,8 +14,6 @@ const hasNetwork = require('has-network');
 const ref = require('ssb-ref');
 require('zii');
 
-function noop() {}
-
 let lastCheck = 0;
 let lastValue: any = null;
 function hasNetworkDebounced() {
@@ -130,7 +128,7 @@ export class ConnScheduler {
       .filter(notBluetooth) // TODO remove this?
       .z(sortByStateChange)
       .z(take(excess))
-      .forEach(([addr]) => this.hub.disconnect(addr).then(noop, noop));
+      .forEach(([addr]) => this.hub.disconnect(addr));
 
     // Connect to suitable candidates
     peersDown
@@ -141,31 +139,22 @@ export class ConnScheduler {
       .filter(passesExpBackoff(backoffStep, backoffMax))
       .z(sortByStateChange)
       .z(take(freeSlots))
-      .forEach(([addr, peer]) => this.hub.connect(addr, peer).then(noop, noop));
+      .forEach(([addr, peer]) => this.hub.connect(addr, peer));
   }
 
   private updateConnectionsNow() {
     // Respect some limits: don't attempt to connect while migration is running
     if (!this.ssb.ready() || this.isCurrentlyDownloading()) return;
 
-    if (this.conf('seed', true))
+    if (this.conf('seed', true)) {
       this.updateTheseConnections(p => p[1].source === 'seed', {
         quota: 3,
         backoffStep: 2e3,
         backoffMax: 10 * minute,
         groupMin: 1e3,
       });
+    }
 
-    // TODO autoconnect to local ONLY if we are following them
-    // if (this.conf('local', true))
-    //   this.updateTheseConnections(isLocal, {
-    //     quota: 3,
-    //     backoffStep: 2e3,
-    //     backoffMax: 10 * minute,
-    //     groupMin: 1e3,
-    //   });
-
-    // prioritize friends
     this.updateTheseConnections(hasPinged, {
       quota: 2,
       backoffStep: 10e3,
@@ -194,11 +183,17 @@ export class ConnScheduler {
       groupMin: 5 * minute,
     });
 
-    // Purge some old staged peers
+    // Purge some old staged LAN peers
     this.query
       .peersConnectable('staging')
-      // TODO replace this with the field staged[1].ephemeral (boolean)
-      .filter(staged => staged[1].type === 'bt' || staged[1].type === 'lan')
+      .filter(staged => staged[1].type === 'lan')
+      .filter(staged => staged[1].stagingUpdated! + 20e3 < Date.now())
+      .forEach(([addr]) => (this.ssb.conn as CONN).unstage(addr));
+
+    // Purge some old staged Bluetooth peers
+    this.query
+      .peersConnectable('staging')
+      .filter(staged => staged[1].type === 'bt')
       .filter(staged => staged[1].stagingUpdated! + 30e3 < Date.now())
       .forEach(([addr]) => (this.ssb.conn as CONN).unstage(addr));
 
@@ -212,7 +207,7 @@ export class ConnScheduler {
         return !permanent || this.hub.getState(peer[0]) === 'connecting';
       })
       .filter(peer => peer[1].stateChange! + 10e3 < Date.now())
-      .forEach(([addr]) => this.hub.disconnect(addr).then(noop, noop));
+      .forEach(([addr]) => this.hub.disconnect(addr));
   }
 
   private updateConnectionsSoon() {
@@ -284,8 +279,6 @@ export class ConnScheduler {
               note: btPeer.displayName,
               key: btPeer.id,
             });
-
-            // TODO after some seconds or minutes, unstage each one
           }
         }),
       );
