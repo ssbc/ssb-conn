@@ -245,15 +245,17 @@ export class ConnScheduler {
       .forEach(([addr]) => this.hub.disconnect(addr));
   }
 
-  private updateConnectionsSoon() {
+  private updateConnectionsSoon(period: number = 1000) {
     if (this.closed) return;
     if (this.hasScheduledAnUpdate) return;
-    this.hasScheduledAnUpdate = true;
+
     // Add some time randomization to avoid deadlocks with remote peers
+    const fuzzyPeriod = period * 0.5 + period * Math.random();
+    this.hasScheduledAnUpdate = true;
     const timer = setTimeout(() => {
       this.updateConnectionsNow();
       this.hasScheduledAnUpdate = false;
-    }, 1000 * Math.random());
+    }, fuzzyPeriod);
     if (timer.unref) timer.unref();
   }
 
@@ -321,9 +323,6 @@ export class ConnScheduler {
     if (!this.closed) return;
     this.closed = false;
 
-    // Upon init, load some follow-and-blocks data
-    this.updateHops();
-
     // Upon init, purge some undesired DB entries
     for (let [address, {source, type}] of this.db.entries()) {
       if (
@@ -336,8 +335,15 @@ export class ConnScheduler {
       }
     }
 
-    // Upon init, attempt to make some connections
-    this.updateConnectionsSoon();
+    // Upon init, populate with seeds
+    this.populateWithSeeds();
+
+    // Upon init, setup discovery via various modes
+    this.setupPubDiscovery();
+    this.setupBluetoothDiscovery();
+
+    // Upon init, load some follow-and-blocks data
+    this.updateHops();
 
     // Upon regular time intervals, attempt to make connections
     const int = setInterval(() => this.updateConnectionsSoon(), 2e3);
@@ -353,15 +359,11 @@ export class ConnScheduler {
     pull(
       this.hub.listen(),
       pull.filter((ev: HubEvent) => ev.type === 'disconnected'),
-      pull.drain(() => this.updateConnectionsSoon()),
+      pull.drain(() => this.updateConnectionsSoon(400)),
     );
 
-    // Upon init, populate with seeds
-    this.populateWithSeeds();
-
-    // Upon init, setup discovery via various modes
-    this.setupPubDiscovery();
-    this.setupBluetoothDiscovery();
+    // Upon init, attempt to make some connections
+    this.updateConnectionsNow();
   };
 
   @muxrpc('sync')
