@@ -63,13 +63,11 @@ Under `ssb.conn.*` you can call any of these APIs in your local peer.
 | **`stop()`** | `sync` | Stops the CONN scheduler if it is currently active. |
 | **`ping()`** | `duplex` | A duplex pull-stream for periodically pinging with peers, fully compatible with `ssb.gossip.ping`. |
 
-An "entry" is a (tuple) array with a multiserver address and an object with data:
+An "entry" is a (tuple) array with a multiserver address (string that [follows some rules](https://github.com/dominictarr/multiserver-address)) and data (an object):
 
 ```javascript
-[address /* string */, data]
+[addr, data]
 ```
-
-A multiserver address is a string that [follows some rules](https://github.com/dominictarr/multiserver-address).
 
 ## Gossip compatibility
 
@@ -77,17 +75,17 @@ The following gossip plugin APIs are available once you install CONN, but **thes
 
 | API | Type |
 |-----|------|
-| **`peers()`** | `sync` |
-| **`get(p)`** | `sync` |
-| **`connect(p)`** | `async` |
-| **`disconnect(p)`** | `async` |
-| **`changes()`** | `source` |
-| **`add(p, source)`** | `sync` |
-| **`remove(p)`** | `sync` |
-| **`ping()`** | `duplex` |
-| **`reconnect()`** | `sync` |
-| **`enable()`** | `sync` |
-| **`disable()`** | `sync` |
+| **`ssb.gossip.peers()`** | `sync` |
+| **`ssb.gossip.get(p)`** | `sync` |
+| **`ssb.gossip.connect(p)`** | `async` |
+| **`ssb.gossip.disconnect(p)`** | `async` |
+| **`ssb.gossip.changes()`** | `source` |
+| **`ssb.gossip.add(p, source)`** | `sync` |
+| **`ssb.gossip.remove(p)`** | `sync` |
+| **`ssb.gossip.ping()`** | `duplex` |
+| **`ssb.gossip.reconnect()`** | `sync` |
+| **`ssb.gossip.enable()`** | `sync` |
+| **`ssb.gossip.disable()`** | `sync` |
 
 If you want to use the new CONN infrastructure but preserve the same gossip behavior as before, use [`ssb-legacy-conn`](https://github.com/staltz/ssb-legacy-conn) which tries to mirror the gossip plugin, even its log messages.
 
