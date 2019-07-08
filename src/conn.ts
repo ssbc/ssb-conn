@@ -161,6 +161,23 @@ export class CONN {
 
   //#region PUBLIC MUXRPC
 
+  @muxrpc('sync')
+  public remember = (address: string, data: any = {}) => {
+    this.assertValidAddress(address);
+
+    this.connDB.set(address, data);
+  };
+
+  @muxrpc('sync')
+  public forget = (address: string) => {
+    this.assertValidAddress(address);
+
+    this.connDB.delete(address);
+  };
+
+  @muxrpc('sync')
+  public dbPeers = () => this.connDB.entries();
+
   @muxrpc('async')
   public connect = (
     address: string,
@@ -199,6 +216,9 @@ export class CONN {
       .then(result => cb && cb(null, result), err => cb && cb(err));
   };
 
+  @muxrpc('source')
+  public peers = () => this.connHub.liveEntries();
+
   @muxrpc('sync')
   public stage = (
     address: string,
@@ -212,25 +232,11 @@ export class CONN {
     return this.connStaging.unstage(address);
   };
 
-  @muxrpc('sync')
-  public remember = (address: string, data: any = {}) => {
-    this.assertValidAddress(address);
-
-    this.connDB.set(address, data);
-  };
-
-  @muxrpc('sync')
-  public forget = (address: string) => {
-    this.assertValidAddress(address);
-
-    this.connDB.delete(address);
-  };
-
-  @muxrpc('source')
-  public peers = () => this.connHub.liveEntries();
-
   @muxrpc('source')
   public stagedPeers = () => this.connStaging.liveEntries();
+
+  @muxrpc('sync')
+  public query = () => this.connQuery;
 
   @muxrpc('sync')
   public start = () => {
@@ -253,16 +259,13 @@ export class CONN {
   };
 
   @muxrpc('sync')
-  public internalConnDb = () => this.connDB;
+  public internalConnDB = () => this.connDB;
 
   @muxrpc('sync')
   public internalConnHub = () => this.connHub;
 
   @muxrpc('sync')
   public internalConnStaging = () => this.connStaging;
-
-  @muxrpc('sync')
-  public internalConnQuery = () => this.connQuery;
 
   //#endregion
 }

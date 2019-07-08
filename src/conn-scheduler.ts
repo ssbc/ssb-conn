@@ -1,4 +1,3 @@
-import ConnDB = require('ssb-conn-db');
 import ConnHub = require('ssb-conn-hub');
 import ConnQuery = require('ssb-conn-query');
 import {ListenEvent as HubEvent} from 'ssb-conn-hub/lib/types';
@@ -73,11 +72,9 @@ type BTPeer = {remoteAddress: string; id: string; displayName: string};
 
 @plugin('1.0.0')
 export class ConnScheduler {
-  private ssb: any;
+  private ssb: {conn: CONN; [name: string]: any};
   private config: any;
-  private db: ConnDB;
   private hub: ConnHub;
-  private query: ConnQuery;
   private closed: boolean;
   private lastMessageAt: number;
   private hasScheduledAnUpdate: boolean;
@@ -86,9 +83,7 @@ export class ConnScheduler {
   constructor(ssb: any, config: any) {
     this.ssb = ssb;
     this.config = config;
-    this.db = this.ssb.conn.internalConnDb();
     this.hub = this.ssb.conn.internalConnHub();
-    this.query = this.ssb.conn.internalConnQuery();
     this.closed = true;
     this.lastMessageAt = 0;
     this.hasScheduledAnUpdate = false;
@@ -130,21 +125,22 @@ export class ConnScheduler {
     return this.lastMessageAt && this.lastMessageAt > Date.now() - 500;
   }
 
-  private weBlockThem([_addr, data]: Peer) {
+  private weBlockThem = ([_addr, data]: Peer) => {
     if (!data || !data.key) return false;
     return this.hops[data.key] === -1;
-  }
+  };
 
-  private weFollowThem([_addr, data]: Peer) {
+  private weFollowThem = ([_addr, data]: Peer) => {
     if (!data || !data.key) return false;
     return this.hops[data.key] > 0;
-  }
+  };
 
   // Utility to connect to bunch of peers, or disconnect if over quota
   // opts: { quota, backoffStep, backoffMax, groupMin }
   private updateTheseConnections(test: (p: Peer) => boolean, opts: any) {
-    const peersUp = this.query.peersInConnection().filter(test);
-    const peersDown = this.query.peersConnectable('db').filter(test);
+    const query = this.ssb.conn.query();
+    const peersUp = query.peersInConnection().filter(test);
+    const peersDown = query.peersConnectable('db').filter(test);
     const {quota, backoffStep, backoffMax, groupMin} = opts;
     const excess = peersUp.length > quota * 2 ? peersUp.length - quota : 0;
     const freeSlots = Math.max(quota - peersUp.length, 0);
@@ -208,34 +204,39 @@ export class ConnScheduler {
     });
 
     // Automatically connect to (five) staged peers we follow
-    this.query
+    this.ssb.conn
+      .query()
       .peersConnectable('staging')
-      .filter(p => this.weFollowThem(p))
+      .filter(this.weFollowThem)
       .z(take(5))
       .forEach(([addr, data]) => this.hub.connect(addr, data));
 
     // Purge connected peers that are now blocked
-    this.query
+    this.ssb.conn
+      .query()
       .peersInConnection()
-      .filter(p => this.weBlockThem(p))
+      .filter(this.weBlockThem)
       .forEach(([addr]) => this.hub.disconnect(addr));
 
     // Purge some old staged LAN peers
-    this.query
+    this.ssb.conn
+      .query()
       .peersConnectable('staging')
       .filter(([, data]) => data.type === 'lan')
       .filter(([, data]) => data.stagingUpdated! + 20e3 < Date.now())
-      .forEach(([addr]) => (this.ssb.conn as CONN).unstage(addr));
+      .forEach(([addr]) => this.ssb.conn.unstage(addr));
 
     // Purge some old staged Bluetooth peers
-    this.query
+    this.ssb.conn
+      .query()
       .peersConnectable('staging')
       .filter(([, data]) => data.type === 'bt')
       .filter(([, data]) => data.stagingUpdated! + 30e3 < Date.now())
-      .forEach(([addr]) => (this.ssb.conn as CONN).unstage(addr));
+      .forEach(([addr]) => this.ssb.conn.unstage(addr));
 
     // Purge some ongoing frustrating connection attempts
-    this.query
+    this.ssb.conn
+      .query()
       .peersInConnection()
       .filter(peer => {
         const permanent = hasPinged(peer) || isLocal(peer);
@@ -303,7 +304,7 @@ export class ConnScheduler {
               '~' +
               `shs:${btPeer.id.replace(/^\@/, '').replace(/\.ed25519$/, '')}`;
 
-            (this.ssb.conn as CONN).stage(address, {
+            this.ssb.conn.stage(address, {
               type: 'bt',
               note: btPeer.displayName,
               key: btPeer.id,
@@ -324,14 +325,14 @@ export class ConnScheduler {
     this.closed = false;
 
     // Upon init, purge some undesired DB entries
-    for (let [address, {source, type}] of this.db.entries()) {
+    for (let [address, {source, type}] of this.ssb.conn.dbPeers()) {
       if (
         source === 'local' ||
         source === 'bt' ||
         type === 'lan' ||
         type === 'bt'
       ) {
-        (this.ssb.conn as CONN).forget(address);
+        this.ssb.conn.forget(address);
       }
     }
 
