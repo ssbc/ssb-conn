@@ -58,7 +58,7 @@ Under `ssb.conn.*` you can call any of these APIs in your local peer.
 | **`stage(addr, data?)`** | `sync` | Registers a suggested connection to a new peer, known by its multiserver address `addr` and additional optional `data` (as an object). |
 | **`unstage(addr)`** | `sync` | Unregisters a suggested connection the peer known by its multiserver address `addr`. |
 | **`stagedPeers()`** | `source` | A pull-stream that emits an array of all staged "entries" (see definition below) whenever any staging status updates (upon stage() or unstage()). |
-| **`query()`** | `sync` | Returns an instance of ConnQuery. |
+| **`query()`** | `sync` | Returns an instance of [ConnQuery](https://github.com/staltz/ssb-conn-query). |
 | **`start()`** | `sync` | Triggers the start of the connection scheduler in CONN. |
 | **`stop()`** | `sync` | Stops the CONN scheduler if it is currently active. |
 | **`ping()`** | `duplex` | A duplex pull-stream for periodically pinging with peers, fully compatible with `ssb.gossip.ping`. |
@@ -193,7 +193,7 @@ module.exports = class ConnScheduler {
 }
 ```
 
-Note that the name of the plugin must be **exactly `ConnScheduler`** (or `connScheduler`) because the CONN core will try to use your scheduler under that name. The rest of the contents of the ConnScheduler class are up to you, you can use private methods, etc.
+Note that the name of the plugin must be **exactly `ConnScheduler`** (or `connScheduler`) and it **must have the methods start() and stop()**, because the CONN core will try to use your scheduler under those names. The rest of the contents of the ConnScheduler class are up to you, you can use private methods, etc.
 
 When you're done building your scheduler, you can export it together with CONN core and the gossip compatibility plugin like this:
 
@@ -204,6 +204,8 @@ var ConnScheduler = require('./my-scheduler')
 
 module.exports = [CONN, ConnScheduler, Gossip]
 ```
+
+That array is a valid secret-stack plugin which you can `.use()` in ssb-server.
 
 **Pro tip:** when implementing your ConnScheduler, you have access to `ssb.conn.*` APIs, but if you need more precision, you can access lower level APIs belonging to ConnDB, ConnHub, and ConnStaging:
 
