@@ -113,6 +113,8 @@ export class ConnScheduler {
         }
         this.hops = hops;
       });
+    } else {
+      debug('Warning: ssb-friends is missing, scheduling will miss some info');
     }
   }
 
@@ -281,17 +283,9 @@ export class ConnScheduler {
             msg.content.address &&
             ref.isAddress(msg.content.address),
         ),
-        pull.drain(
-          (msg: Msg<PubContent>['value']) => {
-            this.ssb.gossip.add(msg.content.address, 'pub');
-          },
-          (...args: Array<any>) => {
-            console.warn(
-              '[gossip] warning: this can happen if the database closes',
-              args,
-            );
-          },
-        ),
+        pull.drain((msg: Msg<PubContent>['value']) => {
+          this.ssb.gossip.add(msg.content.address, 'pub');
+        }),
       );
     }
   }
@@ -314,6 +308,10 @@ export class ConnScheduler {
             });
           }
         }),
+      );
+    } else {
+      debug(
+        'Warning: ssb-bluetooth is missing, scheduling will miss some info',
       );
     }
   }
@@ -355,14 +353,7 @@ export class ConnScheduler {
     pull(
       this.hub.listen(),
       pull.filter((ev: HubEvent) => ev.type === 'disconnected'),
-      pull.drain(
-        () => this.updateConnectionsSoon(),
-        (...args: Array<any>) =>
-          console.warn(
-            '[gossip/dc] warning: this can happen if the database closes',
-            args,
-          ),
-      ),
+      pull.drain(() => this.updateConnectionsSoon()),
     );
 
     // Upon init, populate with seeds
