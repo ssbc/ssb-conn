@@ -94,7 +94,7 @@ If you want to use the new CONN infrastructure but preserve the same gossip beha
 ## Learn more
 
 <details>
-  <summary><strong>How CONN works (click here)</summary>
+  <summary>How CONN works (click here)</summary>
   <p>
 
 ![diagram.png](diagram.png)
@@ -123,7 +123,7 @@ When you install the ssb-plugin, it will actually setup three plugins:
 </details>
 
 <details>
-  <summary><strong>Opinions built into the default scheduler (click here)</summary>
+  <summary>Opinions built into the default scheduler (click here)</summary>
   <p>
 
 The default scheduler is roughly the same as the legacy ssb-gossip plugin, with some opinions removed and others added. The scheduler has two parts: discovery setup on startup, and periodic connections/disconnections.
@@ -158,7 +158,7 @@ In none of the cases above shall we connect to a peer that we block.
 </details>
 
 <details>
-  <summary><strong>How to build your own ConnScheduler (click here)</summary>
+  <summary>How to build your own ConnScheduler (click here)</summary>
   <p>
 
 To experiment with your own opinions for establishing connections, you can make your own ConnScheduler, which is just a typical SSB plugin. You can write in the traditional style (like other SSB plugins), or with OOP decorators. The example below uses OOP decorators.
@@ -215,7 +215,7 @@ module.exports = [CONN, ConnScheduler, Gossip]
 </details>
 
 <details>
-  <summary><strong>Why was the gossip plugin refactored? (click here)</summary>
+  <summary>Why was the gossip plugin refactored? (click here)</summary>
   <p>
 
 The legacy gossip plugin is one of the oldest parts of the SSB stack in Node.js, and it contained several old opinions. It wasn't designed with multiserver in mind, so it made a lot of assumptions that peers have `host`/`port` fields. Nowadays with Bluetooth and other unusual modes of connectivity, that assumption breaks down often.
