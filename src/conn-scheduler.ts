@@ -221,15 +221,15 @@ export class ConnScheduler {
     // Purge some old staged LAN peers
     this.query
       .peersConnectable('staging')
-      .filter(staged => staged[1].type === 'lan')
-      .filter(staged => staged[1].stagingUpdated! + 20e3 < Date.now())
+      .filter(([, data]) => data.type === 'lan')
+      .filter(([, data]) => data.stagingUpdated! + 20e3 < Date.now())
       .forEach(([addr]) => (this.ssb.conn as CONN).unstage(addr));
 
     // Purge some old staged Bluetooth peers
     this.query
       .peersConnectable('staging')
-      .filter(staged => staged[1].type === 'bt')
-      .filter(staged => staged[1].stagingUpdated! + 30e3 < Date.now())
+      .filter(([, data]) => data.type === 'bt')
+      .filter(([, data]) => data.stagingUpdated! + 30e3 < Date.now())
       .forEach(([addr]) => (this.ssb.conn as CONN).unstage(addr));
 
     // Purge some ongoing frustrating connection attempts
