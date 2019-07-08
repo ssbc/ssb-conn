@@ -154,6 +154,8 @@ In none of the cases above shall we connect to a peer that we block.
 - Upon network (interface) changes, fully reset the ConnHub
 - Upon a disconnection, try to connect to some peer (section above)
 
+<ul></ul>
+
   </p>
 </details>
 
@@ -211,6 +213,8 @@ module.exports = [CONN, ConnScheduler, Gossip]
 - `ssb.conn.internalConnHub().*`
 - `ssb.conn.internalConnStaging().*`
 
+<ul></ul>
+
   </p>
 </details>
 
@@ -230,6 +234,8 @@ The objectives with CONN were to:
 - Standardize the assumption that addresses are always multiserver addresses
 - All "pools" (DB, Hub, Staging) are key-value pairs `[address, dataObject]`
 - Make scheduling easily customizable but provide an opinionated default
+
+<ul></ul>
 
   </p>
 </details>
