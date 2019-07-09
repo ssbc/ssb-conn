@@ -72,9 +72,9 @@ type BTPeer = {remoteAddress: string; id: string; displayName: string};
 
 @plugin('1.0.0')
 export class ConnScheduler {
-  private ssb: {conn: CONN; [name: string]: any};
-  private config: any;
-  private hub: ConnHub;
+  private readonly ssb: {conn: CONN; [name: string]: any};
+  private readonly config: any;
+  private readonly hub: ConnHub;
   private closed: boolean;
   private lastMessageAt: number;
   private hasScheduledAnUpdate: boolean;
