@@ -251,24 +251,11 @@ export class Gossip {
     if (parsed.key === this.ssb.id) return;
 
     if (source === 'local') {
-      this.connStaging.stage(addressString, {
-        type: 'lan',
-        host: parsed.host,
-        port: parsed.port,
-        key: parsed.key,
-        address: addressString,
-        duration: 0,
-      });
-      this.notify({
-        type: 'discover',
-        peer: {
-          ...parsed,
-          state: this.connHub.getState(addressString),
-          source: source || 'manual',
-        },
-        source: source || 'manual',
-      });
-      return parsed;
+      console.error(
+        'gossip.add(p, "local") from ssb-local is deprecated, ' +
+          'this only supports ssb-lan',
+      );
+      return;
     }
 
     if (this.connDB.has(addressString)) {

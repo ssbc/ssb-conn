@@ -142,7 +142,7 @@ In none of the cases above shall we connect to a peer that we block.
 
 - Automatically connect to (five) staged peers we follow
 - Disconnect from connected peers that have just been blocked
-- Unstage LAN peers that haven't been updated in ConnStaging in 20 seconds
+- Unstage LAN peers that haven't been updated in ConnStaging in 10 seconds
 - Unstage Bluetooth peers that haven't been updated in ConnStaging in 30 seconds
 - Wait some 10 seconds before disconnecting a "connecting" peer
 

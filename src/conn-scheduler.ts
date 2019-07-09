@@ -2,6 +2,7 @@ import ConnHub = require('ssb-conn-hub');
 import ConnQuery = require('ssb-conn-query');
 import {ListenEvent as HubEvent} from 'ssb-conn-hub/lib/types';
 import {Peer} from 'ssb-conn-query/lib/types';
+import {Discovery as LANDiscovery} from 'ssb-lan/lib/types';
 import {Msg, FeedId} from 'ssb-typescript';
 import {plugin, muxrpc} from 'secret-stack-decorators';
 import {CONN} from './conn';
@@ -10,7 +11,8 @@ const ip = require('ip');
 const onWakeup = require('on-wakeup');
 const onNetwork = require('on-change-network');
 const hasNetwork = require('has-network');
-const ref = require('ssb-ref');
+const Ref = require('ssb-ref');
+const Keys = require('ssb-keys');
 const debug = require('debug')('ssb:conn:scheduler');
 require('zii');
 
@@ -78,6 +80,7 @@ export class ConnScheduler {
   private closed: boolean;
   private lastMessageAt: number;
   private hasScheduledAnUpdate: boolean;
+  private readonly myCapsHash: string;
   private hops: Record<FeedId, number>;
 
   constructor(ssb: any, config: any) {
@@ -87,6 +90,7 @@ export class ConnScheduler {
     this.closed = true;
     this.lastMessageAt = 0;
     this.hasScheduledAnUpdate = false;
+    this.myCapsHash = Keys.hash(config.caps.shs);
     this.hops = {};
 
     this.ssb.post((msg: Msg) => {
@@ -223,7 +227,7 @@ export class ConnScheduler {
       .query()
       .peersConnectable('staging')
       .filter(([, data]) => data.type === 'lan')
-      .filter(([, data]) => data.stagingUpdated! + 20e3 < Date.now())
+      .filter(([, data]) => data.stagingUpdated! + 10e3 < Date.now())
       .forEach(([addr]) => this.ssb.conn.unstage(addr));
 
     // Purge some old staged Bluetooth peers
@@ -284,7 +288,7 @@ export class ConnScheduler {
           (msg: Msg<PubContent>['value']) =>
             msg.content &&
             msg.content.address &&
-            ref.isAddress(msg.content.address),
+            Ref.isAddress(msg.content.address),
         ),
         pull.drain((msg: Msg<PubContent>['value']) => {
           this.ssb.gossip.add(msg.content.address, 'pub');
@@ -319,6 +323,27 @@ export class ConnScheduler {
     }
   }
 
+  private setupLanDiscovery() {
+    if (this.ssb.lan && this.ssb.lan.discoveredPeers) {
+      pull(
+        this.ssb.lan.discoveredPeers(),
+        pull.drain(({address, capsHash}: LANDiscovery) => {
+          const peer = Ref.parseAddress(address);
+          if (peer && peer.key && capsHash === this.myCapsHash) {
+            this.ssb.conn.stage(address, {
+              type: 'lan',
+              key: peer.key,
+            });
+          }
+        }),
+      );
+
+      this.ssb.lan.start();
+    } else {
+      debug('Warning: ssb-lan is missing, scheduling will miss some info');
+    }
+  }
+
   @muxrpc('sync')
   public start = () => {
     if (!this.closed) return;
@@ -341,6 +366,7 @@ export class ConnScheduler {
 
     // Upon init, setup discovery via various modes
     this.setupPubDiscovery();
+    this.setupLanDiscovery();
     this.setupBluetoothDiscovery();
 
     // Upon init, load some follow-and-blocks data
