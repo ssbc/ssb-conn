@@ -327,13 +327,13 @@ export class ConnScheduler {
     if (this.ssb.lan && this.ssb.lan.start && this.ssb.lan.discoveredPeers) {
       pull(
         this.ssb.lan.discoveredPeers(),
-        pull.drain(({address, capsHash}: LANDiscovery) => {
+        pull.drain(({address, capsHash, verified}: LANDiscovery) => {
           const peer = Ref.parseAddress(address);
-          if (peer && peer.key && capsHash === this.myCapsHash) {
-            this.ssb.conn.stage(address, {
-              type: 'lan',
-              key: peer.key,
-            });
+          const isLegacy = !capsHash;
+          const capsHashOkay = isLegacy || capsHash === this.myCapsHash;
+          const verifiedOkay = isLegacy || verified;
+          if (peer && peer.key && capsHashOkay && verifiedOkay) {
+            this.ssb.conn.stage(address, {type: 'lan', key: peer.key});
           }
         }),
       );
