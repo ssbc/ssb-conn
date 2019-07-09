@@ -43,7 +43,7 @@
   "scripts": {
     "typescript": "tsc",
     "tape": "set -e; for t in test/*.js; do node $t; done",
-    "test": "npm run typescript"
+    "test": "npm run typescript && npm run tape"
   },
   "author": "Andre Staltz <contact@staltz.com> (http://staltz.com)",
   "license": "MIT"
