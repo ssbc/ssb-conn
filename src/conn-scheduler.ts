@@ -324,7 +324,7 @@ export class ConnScheduler {
   }
 
   private setupLanDiscovery() {
-    if (this.ssb.lan && this.ssb.lan.discoveredPeers) {
+    if (this.ssb.lan && this.ssb.lan.start && this.ssb.lan.discoveredPeers) {
       pull(
         this.ssb.lan.discoveredPeers(),
         pull.drain(({address, capsHash}: LANDiscovery) => {
@@ -395,6 +395,7 @@ export class ConnScheduler {
 
   @muxrpc('sync')
   public stop = () => {
+    if (this.ssb.lan && this.ssb.lan.stop) this.ssb.lan.stop();
     this.hub.reset();
     this.closed = true;
   };
