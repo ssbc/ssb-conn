@@ -155,6 +155,8 @@ export class CONN {
     address: string,
     data: Partial<StagedData> = {type: 'internet'},
   ) => {
+    if (!!this.hub.getState(address)) return false;
+
     return this.staging.stage(address, data);
   };
 

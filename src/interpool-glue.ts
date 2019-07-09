@@ -25,6 +25,7 @@ export function interpoolGlue(db: ConnDB, hub: ConnHub, staging: ConnStaging) {
   }
 
   function onConnecting(ev: HubEvent) {
+    staging.unstage(ev.address);
     db.update(ev.address, {stateChange: Date.now()});
   }
 
@@ -37,6 +38,7 @@ export function interpoolGlue(db: ConnDB, hub: ConnHub, staging: ConnStaging) {
   }
 
   function onConnected(ev: HubEvent) {
+    staging.unstage(ev.address);
     db.update(ev.address, {stateChange: Date.now(), failure: 0});
     if (ev.details.isClient) setupPing(ev.address, ev.details.rpc);
   }
@@ -54,6 +56,8 @@ export function interpoolGlue(db: ConnDB, hub: ConnHub, staging: ConnStaging) {
       stateChange: Date.now(),
       duration: stats(prev.duration, Date.now() - prev.stateChange),
     }));
+    // TODO ping this address to see if it's worth re-staging it
+    // But how to "ping" without multiserver-connecting to them?
   }
 
   pull(
