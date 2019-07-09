@@ -13,18 +13,18 @@ const ping = require('pull-ping');
 export class CONN {
   private readonly ssb: any;
   private readonly config: any;
-  private readonly connDB: ConnDB;
-  private readonly connHub: ConnHub;
-  private readonly connStaging: ConnStaging;
+  private readonly db: ConnDB;
+  private readonly hub: ConnHub;
+  private readonly staging: ConnStaging;
   private readonly connQuery: ConnQuery;
 
   constructor(ssb: any, cfg: any) {
     this.ssb = ssb;
     this.config = cfg;
-    this.connDB = new ConnDB({path: this.config.path, writeTimeout: 10e3});
-    this.connHub = new ConnHub(this.ssb);
-    this.connStaging = new ConnStaging();
-    this.connQuery = new ConnQuery(this.connDB, this.connHub, this.connStaging);
+    this.db = new ConnDB({path: this.config.path, writeTimeout: 10e3});
+    this.hub = new ConnHub(this.ssb);
+    this.staging = new ConnStaging();
+    this.connQuery = new ConnQuery(this.db, this.hub, this.staging);
 
     this.initialize();
   }
@@ -34,16 +34,16 @@ export class CONN {
   private initialize() {
     this.setupCloseHook();
     this.maybeAutoStartScheduler();
-    interpoolGlue(this.connDB, this.connHub, this.connStaging);
+    interpoolGlue(this.db, this.hub, this.staging);
   }
 
   private setupCloseHook() {
     const that = this;
     this.ssb.close.hook(function(this: any, fn: Function, args: Array<any>) {
       that.stopScheduler();
-      that.connDB.close();
-      that.connHub.close();
-      that.connStaging.close();
+      that.db.close();
+      that.hub.close();
+      that.staging.close();
       return fn.apply(this, args);
     });
   }
@@ -59,7 +59,7 @@ export class CONN {
   //#region Helper methods
 
   private async startScheduler() {
-    await this.connDB.loaded();
+    await this.db.loaded();
 
     if (this.ssb.connScheduler) {
       this.ssb.connScheduler.start();
@@ -96,18 +96,18 @@ export class CONN {
   public remember = (address: string, data: any = {}) => {
     this.assertValidAddress(address);
 
-    this.connDB.set(address, data);
+    this.db.set(address, data);
   };
 
   @muxrpc('sync')
   public forget = (address: string) => {
     this.assertValidAddress(address);
 
-    this.connDB.delete(address);
+    this.db.delete(address);
   };
 
   @muxrpc('sync')
-  public dbPeers = () => this.connDB.entries();
+  public dbPeers = () => this.db.entries();
 
   @muxrpc('async')
   public connect = (
@@ -128,7 +128,7 @@ export class CONN {
       return;
     }
 
-    this.connHub
+    this.hub
       .connect(address, data)
       .then(result => cb && cb(null, result), err => cb && cb(err));
   };
@@ -142,29 +142,29 @@ export class CONN {
       return;
     }
 
-    this.connHub
+    this.hub
       .disconnect(address)
       .then(result => cb && cb(null, result), err => cb && cb(err));
   };
 
   @muxrpc('source')
-  public peers = () => this.connHub.liveEntries();
+  public peers = () => this.hub.liveEntries();
 
   @muxrpc('sync')
   public stage = (
     address: string,
     data: Partial<StagedData> = {type: 'internet'},
   ) => {
-    return this.connStaging.stage(address, data);
+    return this.staging.stage(address, data);
   };
 
   @muxrpc('sync')
   public unstage = (address: string) => {
-    return this.connStaging.unstage(address);
+    return this.staging.unstage(address);
   };
 
   @muxrpc('source')
-  public stagedPeers = () => this.connStaging.liveEntries();
+  public stagedPeers = () => this.staging.liveEntries();
 
   @muxrpc('sync')
   public query = () => this.connQuery;
@@ -190,13 +190,13 @@ export class CONN {
   };
 
   @muxrpc('sync')
-  public internalConnDB = () => this.connDB;
+  public internalConnDB = () => this.db;
 
   @muxrpc('sync')
-  public internalConnHub = () => this.connHub;
+  public internalConnHub = () => this.hub;
 
   @muxrpc('sync')
-  public internalConnStaging = () => this.connStaging;
+  public internalConnStaging = () => this.staging;
 
   //#endregion
 }
