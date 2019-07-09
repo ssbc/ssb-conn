@@ -2,13 +2,11 @@ import ConnDB = require('ssb-conn-db');
 import ConnHub = require('ssb-conn-hub');
 import ConnStaging = require('ssb-conn-staging');
 import ConnQuery = require('ssb-conn-query');
-import {ListenEvent as HubEvent} from 'ssb-conn-hub/lib/types';
 import {StagedData} from 'ssb-conn-staging/lib/types';
 import {plugin, muxrpc} from 'secret-stack-decorators';
 import {Callback} from './types';
-const pull = require('pull-stream');
+import {interpoolGlue} from './interpool-glue';
 const msAddress = require('multiserver-address');
-const stats = require('statistics');
 const ping = require('pull-ping');
 
 @plugin('1.0.0')
@@ -25,7 +23,7 @@ export class CONN {
     this.config = cfg;
     this.connDB = new ConnDB({path: this.config.path, writeTimeout: 10e3});
     this.connHub = new ConnHub(this.ssb);
-    this.connStaging = new ConnStaging(this.connHub);
+    this.connStaging = new ConnStaging();
     this.connQuery = new ConnQuery(this.connDB, this.connHub, this.connStaging);
 
     this.initialize();
@@ -35,8 +33,8 @@ export class CONN {
 
   private initialize() {
     this.setupCloseHook();
-    this.setupConnectionListeners();
     this.maybeAutoStartScheduler();
+    interpoolGlue(this.connDB, this.connHub, this.connStaging);
   }
 
   private setupCloseHook() {
@@ -54,56 +52,6 @@ export class CONN {
     if (this.config.conn && this.config.conn.autostart !== false) {
       this.startScheduler();
     }
-  }
-
-  private setupConnectionListeners() {
-    pull(
-      this.connHub.listen(),
-      pull.drain((ev: HubEvent) => {
-        if (ev.type === 'connecting') this.onConnecting(ev);
-        if (ev.type === 'connecting-failed') this.onConnectingFailed(ev);
-        if (ev.type === 'connected') this.onConnected(ev);
-        if (ev.type === 'disconnecting') this.onDisconnecting(ev);
-        if (ev.type === 'disconnecting-failed') this.onDisconnectingFailed(ev);
-        if (ev.type === 'disconnected') this.onDisconnected(ev);
-      }),
-    );
-  }
-
-  //#endregion
-
-  //#region Hub events
-
-  private onConnecting(ev: HubEvent) {
-    this.connDB.update(ev.address, {stateChange: Date.now()});
-  }
-
-  private onConnectingFailed(ev: HubEvent) {
-    this.connDB.update(ev.address, (prev: any) => ({
-      failure: (prev.failure || 0) + 1,
-      stateChange: Date.now(),
-      duration: stats(prev.duration, 0),
-    }));
-  }
-
-  private onConnected(ev: HubEvent) {
-    this.connDB.update(ev.address, {stateChange: Date.now(), failure: 0});
-    if (ev.details.isClient) this.setupPing(ev.address, ev.details.rpc);
-  }
-
-  private onDisconnecting(ev: HubEvent) {
-    this.connDB.update(ev.address, {stateChange: Date.now()});
-  }
-
-  private onDisconnectingFailed(ev: HubEvent) {
-    this.connDB.update(ev.address, {stateChange: Date.now()});
-  }
-
-  private onDisconnected(ev: HubEvent) {
-    this.connDB.update(ev.address, (prev: any) => ({
-      stateChange: Date.now(),
-      duration: stats(prev.duration, Date.now() - prev.stateChange),
-    }));
   }
 
   //#endregion
@@ -132,23 +80,6 @@ export class CONN {
 
   private stopScheduler() {
     if (this.ssb.connScheduler) this.ssb.connScheduler.stop();
-  }
-
-  private setupPing(address: string, rpc: any) {
-    const PING_TIMEOUT = 5 * 6e4; // 5 minutes
-    const pp = ping({serve: true, timeout: PING_TIMEOUT}, () => {});
-    this.connDB.update(address, {ping: {rtt: pp.rtt, skew: pp.skew}});
-    pull(
-      pp,
-      rpc.gossip.ping({timeout: PING_TIMEOUT}, (err: any) => {
-        if (err && err.name === 'TypeError') {
-          this.connDB.update(address, (prev: any) => ({
-            ping: {...(prev.ping || {}), fail: true},
-          }));
-        }
-      }),
-      pp,
-    );
   }
 
   private assertValidAddress(address: string) {
