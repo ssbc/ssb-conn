@@ -4,6 +4,7 @@ import ConnStaging = require('ssb-conn-staging');
 import {ListenEvent as HubEvent} from 'ssb-conn-hub/lib/types';
 import {Callback, Peer} from './types';
 import {plugin, muxrpc} from 'secret-stack-decorators';
+import {CONN} from './conn';
 const pull = require('pull-stream');
 const Notify = require('pull-notify');
 const ref = require('ssb-ref');
@@ -85,6 +86,7 @@ function inferSource(address: string): Peer['source'] {
 export class Gossip {
   private readonly ssb: any;
   private readonly notify: any;
+  private readonly conn: CONN;
   private readonly connDB: ConnDB;
   private readonly connHub: ConnHub;
   private readonly connStaging: ConnStaging;
@@ -92,12 +94,13 @@ export class Gossip {
   constructor(ssb: any) {
     this.ssb = ssb;
     this.notify = Notify();
-    this.connDB = this.ssb.conn.internalConnDb();
-    this.connHub = this.ssb.conn.internalConnHub();
-    this.connStaging = this.ssb.conn.internalConnStaging();
+    this.conn = this.ssb.conn;
+    this.connDB = this.conn.internalConnDB();
+    this.connHub = this.conn.internalConnHub();
+    this.connStaging = this.conn.internalConnStaging();
 
     this.setupConnectionListeners();
-    this.ssb.conn.start();
+    this.conn.start();
   }
 
   private setupConnectionListeners() {
@@ -217,7 +220,7 @@ export class Gossip {
 
     this.add(addressString, 'manual');
 
-    this.ssb.conn.connect(addressString, cb);
+    this.conn.connect(addressString, cb);
   };
 
   @muxrpc('async')
@@ -233,7 +236,7 @@ export class Gossip {
       return cb(err);
     }
 
-    this.ssb.conn.disconnect(addressString, cb);
+    this.conn.disconnect(addressString, cb);
   };
 
   @muxrpc('source')
@@ -298,7 +301,7 @@ export class Gossip {
   };
 
   @muxrpc('duplex', {anonymous: 'allow'})
-  public ping = () => this.ssb.conn.ping();
+  public ping = () => this.conn.ping();
 
   @muxrpc('sync')
   public reconnect = () => {
