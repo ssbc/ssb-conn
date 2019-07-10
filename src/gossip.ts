@@ -154,7 +154,7 @@ export class Gossip {
   }
 
   @muxrpc('sync')
-  public peers = () => {
+  public peers: () => any = () => {
     console.error('DEPRECATED gossip.peers() was called. Use ssb-conn instead');
     const peers = Array.from(this.connDB.entries()).map(([address, data]) => {
       return {
@@ -183,7 +183,7 @@ export class Gossip {
   // Is this API used 'externally' somehow? We don't use this internally,
   // but it's still used in tests and it's in the manifest
   @muxrpc('sync')
-  public get = (addr: Peer | string) => {
+  public get: (addr: Peer | string) => any = (addr: Peer | string) => {
     console.error('DEPRECATED gossip.get() was called. Use ssb-conn instead');
     if (ref.isFeed(addr)) {
       for (let [address, data] of this.connDB.entries()) {

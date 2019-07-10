@@ -4,6 +4,7 @@
   "version": "0.0.9",
   "homepage": "https://github.com/staltz/ssb-conn",
   "main": "lib/index.js",
+  "types": "lib/index.d.ts",
   "repository": {
     "type": "git",
     "url": "git://github.com/staltz/ssb-conn.git"
