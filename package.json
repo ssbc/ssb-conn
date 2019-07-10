@@ -21,7 +21,7 @@
     "pull-stream": "^3.6.9",
     "ssb-conn-db": "~0.2.0",
     "ssb-conn-hub": "~0.0.9",
-    "ssb-conn-staging": "~0.0.6",
+    "ssb-conn-staging": "~0.0.7",
     "ssb-conn-query": "~0.1.2",
     "secret-stack-decorators": "1.0.0",
     "ssb-keys": "^7.1.3",
