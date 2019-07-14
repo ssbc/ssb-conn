@@ -286,7 +286,7 @@ export class ConnScheduler {
     const seeds = this.config.seeds;
     (Array.isArray(seeds) ? seeds : [seeds]).filter(Boolean).forEach(addr => {
       const key = Ref.getKeyFromAddress(addr);
-      this.ssb.conn.remember(addr, {key});
+      this.ssb.conn.remember(addr, {key, source: 'seed'});
     });
   }
 
