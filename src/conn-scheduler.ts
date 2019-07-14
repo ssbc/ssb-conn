@@ -67,6 +67,10 @@ const {
   sortByStateChange,
 } = ConnQuery;
 
+function shufflePeers(peers: Array<Peer>) {
+  return peers.sort(() => Math.random() - 0.5);
+}
+
 const minute = 60e3;
 const hour = 60 * 60e3;
 
@@ -161,7 +165,12 @@ export class ConnScheduler {
       .filter(canBeConnected)
       .z(passesGroupDebounce(groupMin))
       .filter(passesExpBackoff(backoffStep, backoffMax))
-      .z(sortByStateChange)
+      .z(peers =>
+        // with 30% chance, ignore 'bestness' and just choose randomly
+        Math.random() <= 0.3
+          ? peers.z(shufflePeers)
+          : peers.z(sortByStateChange),
+      )
       .z(take(freeSlots))
       .forEach(([addr, peer]) => this.hub.connect(addr, peer));
   }
