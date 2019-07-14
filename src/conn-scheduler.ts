@@ -248,6 +248,14 @@ export class ConnScheduler {
       })
       .filter(peer => peer[1].stateChange! + 10e3 < Date.now())
       .forEach(([addr]) => this.hub.disconnect(addr));
+
+    // Purge an internet connection after it has been up for 1h
+    this.ssb.conn
+      .query()
+      .peersConnected()
+      .filter(peer => peer[1].type !== 'bt' && peer[1].type !== 'lan')
+      .filter(peer => peer[1].stateChange! + 1 * hour < Date.now())
+      .forEach(([addr]) => this.hub.disconnect(addr));
   }
 
   private updateConnectionsSoon(period: number = 1000) {
@@ -298,7 +306,7 @@ export class ConnScheduler {
             if (this.weBlockThem([address, {key, pool: 'db'}])) {
               this.ssb.conn.forget(address);
             } else {
-              this.ssb.conn.remember(address, {key});
+              this.ssb.conn.remember(address, {key, type: 'internet'});
             }
           } catch (err) {
             debug('cannot db.remember() this address: %s', err);

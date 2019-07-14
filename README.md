@@ -145,6 +145,7 @@ In none of the cases above shall we connect to a peer that we block.
 - Unstage LAN peers that haven't been updated in ConnStaging in 10 seconds
 - Unstage Bluetooth peers that haven't been updated in ConnStaging in 30 seconds
 - Wait some 10 seconds before disconnecting a "connecting" peer
+- Disconnect peer that have been online with us for more than 1 hour
 
 **Other events:**
 
