@@ -268,7 +268,8 @@ export class ConnScheduler {
     // Populate gossip table with configured seeds (mainly used in testing)
     const seeds = this.config.seeds;
     (Array.isArray(seeds) ? seeds : [seeds]).filter(Boolean).forEach(addr => {
-      this.ssb.gossip.add(addr, 'seed');
+      const key = Ref.getKeyFromAddress(addr);
+      this.ssb.conn.remember(addr, {key});
     });
   }
 
@@ -291,7 +292,17 @@ export class ConnScheduler {
             Ref.isAddress(msg.content.address),
         ),
         pull.drain((msg: Msg<PubContent>['value']) => {
-          this.ssb.gossip.add(msg.content.address, 'pub');
+          try {
+            const address = msg.content.address!;
+            const key = Ref.getKeyFromAddress(address);
+            if (this.weBlockThem([address, {key, pool: 'db'}])) {
+              this.ssb.conn.forget(address);
+            } else {
+              this.ssb.conn.remember(address, {key});
+            }
+          } catch (err) {
+            debug('cannot db.remember() this address: %s', err);
+          }
         }),
       );
     }
