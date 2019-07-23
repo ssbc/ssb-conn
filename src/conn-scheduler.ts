@@ -86,6 +86,7 @@ export class ConnScheduler {
   private readonly ssb: {conn: CONN; [name: string]: any};
   private readonly config: any;
   private readonly hub: ConnHub;
+  private readonly hasSsbDb: boolean;
   private closed: boolean;
   private lastMessageAt: number;
   private hasScheduledAnUpdate: boolean;
@@ -95,13 +96,13 @@ export class ConnScheduler {
     this.ssb = ssb;
     this.config = config;
     this.hub = this.ssb.conn.internalConnHub();
+    this.hasSsbDb = !!this.ssb.post && !!this.ssb.messagesByType;
     this.closed = true;
     this.lastMessageAt = 0;
     this.hasScheduledAnUpdate = false;
     this.hops = {};
 
-    // if ssb-db is installed
-    if (this.ssb.post) {
+    if (this.hasSsbDb) {
       this.ssb.post((msg: Msg) => {
         if (msg.value.author != this.ssb.id) {
           this.lastMessageAt = Date.now();
@@ -182,8 +183,8 @@ export class ConnScheduler {
   }
 
   private updateConnectionsNow() {
-    // Respect some limits: don't attempt to connect while migration is running
-    if (!this.ssb.ready() || this.isCurrentlyDownloading()) return;
+    if (this.hasSsbDb && !this.ssb.ready()) return;
+    if (this.isCurrentlyDownloading()) return;
 
     if (this.conf('seed', true)) {
       this.updateTheseConnections(p => p[1].source === 'seed', {
@@ -297,6 +298,11 @@ export class ConnScheduler {
   }
 
   private setupPubDiscovery() {
+    if (!this.hasSsbDb) {
+      debug('Warning: ssb-db is missing, scheduling will miss some info');
+      return;
+    }
+
     // Populate gossip table with pub announcements on the feed
     // (allow this to be disabled via config)
     if (
