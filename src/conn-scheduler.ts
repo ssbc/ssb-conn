@@ -344,7 +344,7 @@ export class ConnScheduler {
               {type: 'bt', note: btPeer.displayName, key: btPeer.id},
             ];
             if (this.weFollowThem(entry)) {
-              this.ssb.conn.connect(...entry);
+              this.hub.connect(...entry);
             } else {
               this.ssb.conn.stage(...entry);
             }
@@ -371,7 +371,7 @@ export class ConnScheduler {
             {type: 'lan', key: peer.key, verified},
           ];
           if (this.weFollowThem(entry)) {
-            this.ssb.conn.connect(...entry);
+            this.hub.connect(...entry);
           } else {
             this.ssb.conn.stage(...entry);
           }
