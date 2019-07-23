@@ -71,6 +71,11 @@ function shufflePeers(peers: Array<Peer>) {
   return peers.sort(() => Math.random() - 0.5);
 }
 
+function neverJustOne(x: number) {
+  if (x === 1) return x + 1;
+  else return x;
+}
+
 const minute = 60e3;
 const hour = 60 * 60e3;
 
@@ -151,7 +156,7 @@ export class ConnScheduler {
     const peersDown = query.peersConnectable('db').filter(test);
     const {quota, backoffStep, backoffMax, groupMin} = opts;
     const excess = peersUp.length > quota * 2 ? peersUp.length - quota : 0;
-    const freeSlots = Math.max(quota - peersUp.length, 0);
+    const freeSlots = neverJustOne(Math.max(quota - peersUp.length, 0));
 
     // Disconnect from excess
     peersUp
