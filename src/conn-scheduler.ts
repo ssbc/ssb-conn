@@ -1,6 +1,7 @@
 import ConnHub = require('ssb-conn-hub');
 import ConnQuery = require('ssb-conn-query');
 import {ListenEvent as HubEvent} from 'ssb-conn-hub/lib/types';
+import {StagedData} from 'ssb-conn-staging/lib/types';
 import {Peer} from 'ssb-conn-query/lib/types';
 import {Discovery as LANDiscovery} from 'ssb-lan/lib/types';
 import {Msg, FeedId} from 'ssb-typescript';
@@ -12,7 +13,6 @@ const onWakeup = require('on-wakeup');
 const onNetwork = require('on-change-network');
 const hasNetwork = require('has-network');
 const Ref = require('ssb-ref');
-const Keys = require('ssb-keys');
 const debug = require('debug')('ssb:conn:scheduler');
 require('zii');
 
@@ -89,7 +89,6 @@ export class ConnScheduler {
   private closed: boolean;
   private lastMessageAt: number;
   private hasScheduledAnUpdate: boolean;
-  private readonly myCapsHash: string;
   private hops: Record<FeedId, number>;
 
   constructor(ssb: any, config: any) {
@@ -99,7 +98,6 @@ export class ConnScheduler {
     this.closed = true;
     this.lastMessageAt = 0;
     this.hasScheduledAnUpdate = false;
-    this.myCapsHash = Keys.hash(config.caps.shs);
     this.hops = {};
 
     this.ssb.post((msg: Msg) => {
@@ -138,12 +136,12 @@ export class ConnScheduler {
     return this.lastMessageAt && this.lastMessageAt > Date.now() - 500;
   }
 
-  private weBlockThem = ([_addr, data]: Peer) => {
+  private weBlockThem = ([_addr, data]: [string, {key?: string}]) => {
     if (!data || !data.key) return false;
     return this.hops[data.key] === -1;
   };
 
-  private weFollowThem = ([_addr, data]: Peer) => {
+  private weFollowThem = ([_addr, data]: [string, {key?: string}]) => {
     if (!data || !data.key) return false;
     return this.hops[data.key] > 0;
   };
@@ -317,7 +315,7 @@ export class ConnScheduler {
           try {
             const address = msg.content.address!;
             const key = Ref.getKeyFromAddress(address);
-            if (this.weBlockThem([address, {key, pool: 'db'}])) {
+            if (this.weBlockThem([address, {key}])) {
               this.ssb.conn.forget(address);
             } else {
               this.ssb.conn.remember(address, {key, type: 'internet'});
@@ -341,11 +339,15 @@ export class ConnScheduler {
               '~' +
               `shs:${btPeer.id.replace(/^\@/, '').replace(/\.ed25519$/, '')}`;
 
-            this.ssb.conn.stage(address, {
-              type: 'bt',
-              note: btPeer.displayName,
-              key: btPeer.id,
-            });
+            const entry: [string, Partial<StagedData>] = [
+              address,
+              {type: 'bt', note: btPeer.displayName, key: btPeer.id},
+            ];
+            if (this.weFollowThem(entry)) {
+              this.ssb.conn.connect(...entry);
+            } else {
+              this.ssb.conn.stage(...entry);
+            }
           }
         }),
       );
@@ -360,13 +362,18 @@ export class ConnScheduler {
     if (this.ssb.lan && this.ssb.lan.start && this.ssb.lan.discoveredPeers) {
       pull(
         this.ssb.lan.discoveredPeers(),
-        pull.drain(({address, capsHash, verified}: LANDiscovery) => {
+        pull.drain(({address, verified}: LANDiscovery) => {
           const peer = Ref.parseAddress(address);
-          const isLegacy = !capsHash;
-          const capsHashOkay = isLegacy || capsHash === this.myCapsHash;
-          const verifiedOkay = isLegacy || verified;
-          if (peer && peer.key && capsHashOkay && verifiedOkay) {
-            this.ssb.conn.stage(address, {type: 'lan', key: peer.key});
+          if (!peer || !peer.key) return;
+
+          const entry: [string, Partial<StagedData>] = [
+            address,
+            {type: 'lan', key: peer.key, verified},
+          ];
+          if (this.weFollowThem(entry)) {
+            this.ssb.conn.connect(...entry);
+          } else {
+            this.ssb.conn.stage(...entry);
           }
         }),
       );
