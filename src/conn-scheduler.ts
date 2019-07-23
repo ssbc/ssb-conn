@@ -100,14 +100,17 @@ export class ConnScheduler {
     this.hasScheduledAnUpdate = false;
     this.hops = {};
 
-    this.ssb.post((msg: Msg) => {
-      if (msg.value.author != this.ssb.id) {
-        this.lastMessageAt = Date.now();
-      }
-      if (msg.value.content && msg.value.content.type === 'contact') {
-        this.updateHops();
-      }
-    });
+    // if ssb-db is installed
+    if (this.ssb.post) {
+      this.ssb.post((msg: Msg) => {
+        if (msg.value.author != this.ssb.id) {
+          this.lastMessageAt = Date.now();
+        }
+        if (msg.value.content && msg.value.content.type === 'contact') {
+          this.updateHops();
+        }
+      });
+    }
   }
 
   private updateHops() {
