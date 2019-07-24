@@ -35,12 +35,12 @@
   "devDependencies": {
     "@types/node": "^11.13.7",
     "cont": "^1.0.3",
-    "ssb-caps": "~1.0.1",
+    "ssb-caps": "~1.1.0",
     "ssb-server": "~15.1.0",
     "ssb-lan": "~0.1.1",
     "secret-stack": ">=6.2.0",
     "tape": "^4.9.2",
-    "typescript": "3.3.x"
+    "typescript": "3.5.x"
   },
   "scripts": {
     "typescript": "tsc",
