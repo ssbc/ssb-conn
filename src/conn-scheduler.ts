@@ -327,7 +327,7 @@ export class ConnScheduler {
             if (this.weBlockThem([address, {key}])) {
               this.ssb.conn.forget(address);
             } else {
-              this.ssb.conn.remember(address, {key, type: 'internet'});
+              this.ssb.conn.remember(address, {key, type: 'pub'});
             }
           } catch (err) {
             debug('cannot db.remember() this address: %s', err);
