@@ -136,7 +136,7 @@ export class ConnScheduler {
   }
 
   private isCurrentlyDownloading() {
-    // don't schedule gossip if currently downloading messages
+    // don't schedule new connections if currently downloading messages
     return this.lastMessageAt && this.lastMessageAt > Date.now() - 500;
   }
 
