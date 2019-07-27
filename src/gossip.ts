@@ -91,6 +91,11 @@ export class Gossip {
   private readonly connHub: ConnHub;
   private readonly connStaging: ConnStaging;
 
+  /**
+   * Timestamp of the latest deprecation warning for gossip.peers()
+   */
+  private latestWarning: number;
+
   constructor(ssb: any) {
     this.ssb = ssb;
     this.notify = Notify();
@@ -98,6 +103,7 @@ export class Gossip {
     this.connDB = this.conn.internalConnDB();
     this.connHub = this.conn.internalConnHub();
     this.connStaging = this.conn.internalConnStaging();
+    this.latestWarning = 0;
 
     this.setupConnectionListeners();
     this.conn.start();
@@ -155,7 +161,10 @@ export class Gossip {
 
   @muxrpc('sync')
   public peers: () => any = () => {
-    console.error('DEPRECATED gossip.peers() was called. Use ssb-conn instead');
+    if (this.latestWarning + 10e3 < Date.now()) {
+      console.trace('DEPRECATED gossip.peers(), use ssb-conn instead');
+      this.latestWarning = Date.now();
+    }
     const peers = Array.from(this.connDB.entries()).map(([address, data]) => {
       return {
         ...data,

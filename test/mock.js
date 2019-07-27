@@ -1,5 +1,6 @@
 const CONN = require('../core');
 const ConnScheduler = require('../scheduler');
+const Gossip = require('../compat');
 const os = require('os');
 const fs = require('fs');
 const path = require('path');
@@ -27,6 +28,7 @@ module.exports = function mock() {
 
   mockSSB.conn = new CONN(mockSSB, mockConfig);
   mockSSB.connScheduler = new ConnScheduler(mockSSB, mockConfig);
+  mockSSB.gossip = new Gossip(mockSSB, mockConfig);
 
   return mockSSB;
 };
