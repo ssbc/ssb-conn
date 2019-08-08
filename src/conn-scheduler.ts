@@ -170,6 +170,7 @@ export class ConnScheduler {
     peersDown
       .filter(p => !this.weBlockThem(p))
       .filter(canBeConnected)
+      .filter(([, data]) => data.autoconnect !== false)
       .z(passesGroupDebounce(groupMin))
       .filter(passesExpBackoff(backoffStep, backoffMax))
       .z(peers =>
@@ -185,6 +186,13 @@ export class ConnScheduler {
   private updateConnectionsNow() {
     if (this.hasSsbDb && !this.ssb.ready()) return;
     if (this.isCurrentlyDownloading()) return;
+
+    // Stage all db peers with autoconnect=false
+    this.ssb.conn
+      .query()
+      .peersConnectable('db')
+      .filter(([, data]) => data.autoconnect === false)
+      .forEach(([addr, data]) => this.ssb.conn.stage(addr, data));
 
     if (this.conf('seed', true)) {
       this.updateTheseConnections(p => p[1].source === 'seed', {
