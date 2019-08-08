@@ -179,7 +179,7 @@ export class ConnScheduler {
           : peers.z(sortByStateChange),
       )
       .z(take(freeSlots))
-      .forEach(([addr, peer]) => this.hub.connect(addr, peer));
+      .forEach(([addr, data]) => this.hub.connect(addr, data));
   }
 
   private updateConnectionsNow() {
@@ -347,15 +347,15 @@ export class ConnScheduler {
               `bt:${btPeer.remoteAddress.split(':').join('')}` +
               '~' +
               `shs:${btPeer.id.replace(/^\@/, '').replace(/\.ed25519$/, '')}`;
-
-            const entry: [string, Partial<StagedData>] = [
-              address,
-              {type: 'bt', note: btPeer.displayName, key: btPeer.id},
-            ];
-            if (this.weFollowThem(entry)) {
-              this.hub.connect(...entry);
+            const data: Partial<StagedData> = {
+              type: 'bt',
+              note: btPeer.displayName,
+              key: btPeer.id,
+            };
+            if (this.weFollowThem([address, data])) {
+              this.hub.connect(address, data);
             } else {
-              this.ssb.conn.stage(...entry);
+              this.ssb.conn.stage(address, data);
             }
           }
         }),
@@ -374,15 +374,15 @@ export class ConnScheduler {
         pull.drain(({address, verified}: LANDiscovery) => {
           const peer = Ref.parseAddress(address);
           if (!peer || !peer.key) return;
-
-          const entry: [string, Partial<StagedData>] = [
-            address,
-            {type: 'lan', key: peer.key, verified},
-          ];
-          if (this.weFollowThem(entry)) {
-            this.hub.connect(...entry);
+          const data: Partial<StagedData> = {
+            type: 'lan',
+            key: peer.key,
+            verified,
+          };
+          if (this.weFollowThem([address, data])) {
+            this.hub.connect(address, data);
           } else {
-            this.ssb.conn.stage(...entry);
+            this.ssb.conn.stage(address, data);
           }
         }),
       );
