@@ -195,6 +195,16 @@ export class ConnScheduler {
       });
     }
 
+    // If there are no peers, then try *any* connection ASAP
+    if (this.ssb.conn.query().peersInConnection().length === 0) {
+      this.updateTheseConnections(_p => true, {
+        quota: 1,
+        backoffStep: 1e3,
+        backoffMax: 6e3,
+        groupMin: 0,
+      });
+    }
+
     this.updateTheseConnections(hasPinged, {
       quota: 2,
       backoffStep: 10e3,
