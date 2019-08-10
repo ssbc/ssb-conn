@@ -22,7 +22,7 @@ export class CONN {
   constructor(ssb: any, cfg: any) {
     this.ssb = ssb;
     this.config = cfg;
-    this.db = new ConnDB({path: this.config.path, writeTimeout: 10e3});
+    this.db = new ConnDB({path: this.config.path, writeTimeout: 1e3});
     this.hub = new ConnHub(this.ssb);
     this.staging = new ConnStaging();
     this.connQuery = new ConnQuery(this.db, this.hub, this.staging);
