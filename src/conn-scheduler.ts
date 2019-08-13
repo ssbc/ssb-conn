@@ -115,17 +115,18 @@ export class ConnScheduler {
   }
 
   private updateHops() {
-    if (this.ssb.friends && this.ssb.friends.hops) {
-      this.ssb.friends.hops((err: any, hops: Record<FeedId, number>) => {
-        if (err) {
-          debug('unable to call ssb.friends.hops: %s', err);
-          return;
-        }
-        this.hops = hops;
-      });
-    } else {
+    if (!this.ssb.friends || !this.ssb.friends.hops) {
       debug('Warning: ssb-friends is missing, scheduling will miss some info');
+      return;
     }
+
+    this.ssb.friends.hops((err: any, hops: Record<FeedId, number>) => {
+      if (err) {
+        debug('unable to call ssb.friends.hops: %s', err);
+        return;
+      }
+      this.hops = hops;
+    });
   }
 
   // Utility to pick from config, with some defaults
@@ -356,59 +357,61 @@ export class ConnScheduler {
   }
 
   private setupBluetoothDiscovery() {
-    if (this.ssb.bluetooth && this.ssb.bluetooth.nearbyScuttlebuttDevices) {
-      pull(
-        this.ssb.bluetooth.nearbyScuttlebuttDevices(1000),
-        pull.drain(({discovered}: {discovered: Array<BTPeer>}) => {
-          for (const btPeer of discovered) {
-            const address =
-              `bt:${btPeer.remoteAddress.split(':').join('')}` +
-              '~' +
-              `shs:${btPeer.id.replace(/^\@/, '').replace(/\.ed25519$/, '')}`;
-            const data: Partial<StagedData> = {
-              type: 'bt',
-              note: btPeer.displayName,
-              key: btPeer.id,
-            };
-            if (this.weFollowThem([address, data])) {
-              this.hub.connect(address, data);
-            } else {
-              this.ssb.conn.stage(address, data);
-            }
-          }
-        }),
-      );
-    } else {
+    if (!this.ssb.bluetooth || !this.ssb.bluetooth.nearbyScuttlebuttDevices) {
       debug(
         'Warning: ssb-bluetooth is missing, scheduling will miss some info',
       );
+      return;
     }
-  }
 
-  private setupLanDiscovery() {
-    if (this.ssb.lan && this.ssb.lan.start && this.ssb.lan.discoveredPeers) {
-      pull(
-        this.ssb.lan.discoveredPeers(),
-        pull.drain(({address, verified}: LANDiscovery) => {
-          const peer = Ref.parseAddress(address);
-          if (!peer || !peer.key) return;
+    pull(
+      this.ssb.bluetooth.nearbyScuttlebuttDevices(1000),
+      pull.drain(({discovered}: {discovered: Array<BTPeer>}) => {
+        for (const btPeer of discovered) {
+          const address =
+            `bt:${btPeer.remoteAddress.split(':').join('')}` +
+            '~' +
+            `shs:${btPeer.id.replace(/^\@/, '').replace(/\.ed25519$/, '')}`;
           const data: Partial<StagedData> = {
-            type: 'lan',
-            key: peer.key,
-            verified,
+            type: 'bt',
+            note: btPeer.displayName,
+            key: btPeer.id,
           };
           if (this.weFollowThem([address, data])) {
             this.hub.connect(address, data);
           } else {
             this.ssb.conn.stage(address, data);
           }
-        }),
-      );
+        }
+      }),
+    );
+  }
 
-      this.ssb.lan.start();
-    } else {
+  private setupLanDiscovery() {
+    if (!this.ssb.lan || !this.ssb.lan.start || !this.ssb.lan.discoveredPeers) {
       debug('Warning: ssb-lan is missing, scheduling will miss some info');
+      return;
     }
+
+    pull(
+      this.ssb.lan.discoveredPeers(),
+      pull.drain(({address, verified}: LANDiscovery) => {
+        const peer = Ref.parseAddress(address);
+        if (!peer || !peer.key) return;
+        const data: Partial<StagedData> = {
+          type: 'lan',
+          key: peer.key,
+          verified,
+        };
+        if (this.weFollowThem([address, data])) {
+          this.hub.connect(address, data);
+        } else {
+          this.ssb.conn.stage(address, data);
+        }
+      }),
+    );
+
+    this.ssb.lan.start();
   }
 
   @muxrpc('sync')
