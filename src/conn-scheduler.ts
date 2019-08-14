@@ -88,6 +88,7 @@ export class ConnScheduler {
   private readonly hub: ConnHub;
   private readonly hasSsbDb: boolean;
   private closed: boolean;
+  private isLoadingHops: boolean;
   private lastMessageAt: number;
   private hasScheduledAnUpdate: boolean;
   private hops: Record<FeedId, number>;
@@ -100,6 +101,7 @@ export class ConnScheduler {
     this.closed = true;
     this.lastMessageAt = 0;
     this.hasScheduledAnUpdate = false;
+    this.isLoadingHops = false;
     this.hops = {};
 
     if (this.hasSsbDb) {
@@ -120,12 +122,14 @@ export class ConnScheduler {
       return;
     }
 
+    this.isLoadingHops = true;
     this.ssb.friends.hops((err: any, hops: Record<FeedId, number>) => {
       if (err) {
         debug('unable to call ssb.friends.hops: %s', err);
         return;
       }
       this.hops = hops;
+      this.isLoadingHops = false;
     });
   }
 
@@ -187,6 +191,7 @@ export class ConnScheduler {
   private updateConnectionsNow() {
     if (this.hasSsbDb && !this.ssb.ready()) return;
     if (this.isCurrentlyDownloading()) return;
+    if (this.isLoadingHops) return;
 
     // Stage all db peers with autoconnect=false
     this.ssb.conn
@@ -431,6 +436,9 @@ export class ConnScheduler {
       }
     }
 
+    // Upon init, load some follow-and-blocks data
+    this.updateHops();
+
     // Upon init, populate with seeds
     this.populateWithSeeds();
 
@@ -438,9 +446,6 @@ export class ConnScheduler {
     this.setupPubDiscovery();
     this.setupLanDiscovery();
     this.setupBluetoothDiscovery();
-
-    // Upon init, load some follow-and-blocks data
-    this.updateHops();
 
     // Upon regular time intervals, attempt to make connections
     const int = setInterval(() => this.updateConnectionsSoon(), 2e3);
@@ -456,11 +461,11 @@ export class ConnScheduler {
     pull(
       this.hub.listen(),
       pull.filter((ev: HubEvent) => ev.type === 'disconnected'),
-      pull.drain(() => this.updateConnectionsSoon(400)),
+      pull.drain(() => this.updateConnectionsSoon(200)),
     );
 
     // Upon init, attempt to make some connections
-    this.updateConnectionsNow();
+    this.updateConnectionsSoon();
   };
 
   @muxrpc('sync')
