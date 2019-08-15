@@ -358,8 +358,13 @@ export class ConnScheduler {
             const key = Ref.getKeyFromAddress(address);
             if (this.weBlockThem([address, {key}])) {
               this.ssb.conn.forget(address);
-            } else {
-              this.ssb.conn.remember(address, {key, type: 'pub'});
+            } else if (!this.ssb.conn.internalConnDB().has(address)) {
+              this.ssb.conn.stage(address, {key, type: 'pub'});
+              this.ssb.conn.remember(address, {
+                key,
+                type: 'pub',
+                autoconnect: false,
+              });
             }
           } catch (err) {
             debug('cannot db.remember() this address: %s', err);
