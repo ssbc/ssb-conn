@@ -354,7 +354,7 @@ export class ConnScheduler {
         ),
         pull.drain((msg: Msg<PubContent>['value']) => {
           try {
-            const address = msg.content.address!;
+            const address = Ref.toMultiServerAddress(msg.content.address!);
             const key = Ref.getKeyFromAddress(address);
             if (this.weBlockThem([address, {key}])) {
               this.ssb.conn.forget(address);
