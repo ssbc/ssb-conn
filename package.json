@@ -1,7 +1,7 @@
 {
   "name": "ssb-conn",
   "description": "SSB plugin for establishing and managing peer connections",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "homepage": "https://github.com/staltz/ssb-conn",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
