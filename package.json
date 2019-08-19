@@ -17,6 +17,7 @@
     "on-change-network": "0.0.2",
     "on-wakeup": "^1.0.1",
     "pull-notify": "^0.1.1",
+    "pull-pause": "~0.0.2",
     "pull-ping": "^2.0.2",
     "pull-stream": "^3.6.9",
     "secret-stack-decorators": "1.0.0",

@@ -8,6 +8,7 @@ import {Msg, FeedId} from 'ssb-typescript';
 import {plugin, muxrpc} from 'secret-stack-decorators';
 import {CONN} from './conn';
 const pull = require('pull-stream');
+const Pausable = require('pull-pause');
 const ip = require('ip');
 const onWakeup = require('on-wakeup');
 const onNetwork = require('on-change-network');
@@ -335,43 +336,55 @@ export class ConnScheduler {
       return;
     }
 
-    // Populate gossip table with pub announcements on the feed
-    // (allow this to be disabled via config)
-    if (
-      !this.config.gossip ||
-      (this.config.gossip.autoPopulate !== false &&
-        this.config.gossip.pub !== false)
-    ) {
-      type PubContent = {address?: string};
-      pull(
-        this.ssb.messagesByType({type: 'pub', live: true, keys: false}),
-        pull.filter((msg: any) => !msg.sync),
-        pull.filter(
-          (msg: Msg<PubContent>['value']) =>
-            msg.content &&
-            msg.content.address &&
-            Ref.isAddress(msg.content.address),
-        ),
-        pull.drain((msg: Msg<PubContent>['value']) => {
-          try {
-            const address = Ref.toMultiServerAddress(msg.content.address!);
-            const key = Ref.getKeyFromAddress(address);
-            if (this.weBlockThem([address, {key}])) {
-              this.ssb.conn.forget(address);
-            } else if (!this.ssb.conn.internalConnDB().has(address)) {
-              this.ssb.conn.stage(address, {key, type: 'pub'});
-              this.ssb.conn.remember(address, {
-                key,
-                type: 'pub',
-                autoconnect: false,
-              });
-            }
-          } catch (err) {
-            debug('cannot db.remember() this address: %s', err);
+    if (this.config.gossip && this.config.gossip.pub === false) return;
+    if (this.config.gossip && this.config.gossip.autoPopulate === false) return;
+
+    type PubContent = {address?: string};
+    const MAX_STAGED_PUBS = 3;
+    const pausable = Pausable();
+
+    pull(
+      this.ssb.messagesByType({type: 'pub', live: true, keys: false}),
+      pull.filter((msg: any) => !msg.sync),
+      pull.filter(
+        (msg: Msg<PubContent>['value']) =>
+          msg.content &&
+          msg.content.address &&
+          Ref.isAddress(msg.content.address),
+      ),
+      pausable,
+      pull.drain((msg: Msg<PubContent>['value']) => {
+        try {
+          const address = Ref.toMultiServerAddress(msg.content.address!);
+          const key = Ref.getKeyFromAddress(address);
+          if (this.weBlockThem([address, {key}])) {
+            this.ssb.conn.forget(address);
+          } else if (!this.ssb.conn.internalConnDB().has(address)) {
+            this.ssb.conn.stage(address, {key, type: 'pub'});
+            this.ssb.conn.remember(address, {
+              key,
+              type: 'pub',
+              autoconnect: false,
+            });
           }
-        }),
-      );
-    }
+        } catch (err) {
+          debug('cannot process discovered pub because: %s', err);
+        }
+      }),
+    );
+
+    // Pause or resume the draining depending on the number of staged pubs
+    pull(
+      this.ssb.conn.internalConnStaging().liveEntries(),
+      pull.drain((staged: Array<any>) => {
+        const stagedPubs = staged.filter(([, data]) => data.type === 'pub');
+        if (stagedPubs.length >= MAX_STAGED_PUBS) {
+          pausable.pause();
+        } else {
+          pausable.resume();
+        }
+      }),
+    );
   }
 
   private setupBluetoothDiscovery() {
