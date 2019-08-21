@@ -7,7 +7,6 @@ import {StagedData} from 'ssb-conn-staging/lib/types';
 import {plugin, muxrpc} from 'secret-stack-decorators';
 import {Callback} from './types';
 import {interpoolGlue} from './interpool-glue';
-const msAddress = require('multiserver-address');
 const ping = require('pull-ping');
 
 @plugin('1.0.0')
@@ -83,27 +82,17 @@ export class CONN {
     if (this.ssb.connScheduler) this.ssb.connScheduler.stop();
   }
 
-  private assertValidAddress(address: string) {
-    if (!msAddress.check(address)) {
-      throw new Error('The given address is not a valid multiserver-address');
-    }
-  }
-
   //#endregion
 
   //#region PUBLIC MUXRPC
 
   @muxrpc('sync')
   public remember = (address: string, data: any = {}) => {
-    this.assertValidAddress(address);
-
     this.db.set(address, data);
   };
 
   @muxrpc('sync')
   public forget = (address: string) => {
-    this.assertValidAddress(address);
-
     this.db.delete(address);
   };
 
@@ -122,27 +111,13 @@ export class CONN {
     const cb = (typeof third === 'function' ? third : second) as Callback<any>;
     const data = (typeof third === 'function' ? second : undefined) as any;
 
-    try {
-      this.assertValidAddress(address);
-    } catch (err) {
-      cb(err);
-      return;
-    }
-
     this.hub
       .connect(address, data)
       .then(result => cb && cb(null, result), err => cb && cb(err));
   };
 
   @muxrpc('async')
-  public disconnect = (address: string, cb: Callback<any>) => {
-    try {
-      this.assertValidAddress(address);
-    } catch (err) {
-      cb(err);
-      return;
-    }
-
+  public disconnect = (address: string, cb?: Callback<any>) => {
     this.hub
       .disconnect(address)
       .then(result => cb && cb(null, result), err => cb && cb(err));
