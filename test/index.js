@@ -17,6 +17,9 @@ tape('CONN APIs are available on SSB', t => {
   t.ok(ssb.conn.unstage, 'ssb.conn.unstage');
   t.ok(ssb.conn.stagedPeers, 'ssb.conn.stagedPeers');
 
+  t.ok(ssb.conn.db, 'ssb.conn.db');
+  t.ok(ssb.conn.hub, 'ssb.conn.hub');
+  t.ok(ssb.conn.staging, 'ssb.conn.staging');
   t.ok(ssb.conn.query, 'ssb.conn.query');
   t.ok(ssb.conn.start, 'ssb.conn.start');
   t.ok(ssb.conn.stop, 'ssb.conn.stop');

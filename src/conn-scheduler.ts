@@ -1,4 +1,3 @@
-import ConnHub = require('ssb-conn-hub');
 import ConnQuery = require('ssb-conn-query');
 import {ListenEvent as HubEvent} from 'ssb-conn-hub/lib/types';
 import {StagedData} from 'ssb-conn-staging/lib/types';
@@ -86,7 +85,6 @@ type BTPeer = {remoteAddress: string; id: string; displayName: string};
 export class ConnScheduler {
   private readonly ssb: {conn: CONN; [name: string]: any};
   private readonly config: any;
-  private readonly hub: ConnHub;
   private readonly hasSsbDb: boolean;
   private closed: boolean;
   private isLoadingHops: boolean;
@@ -97,7 +95,6 @@ export class ConnScheduler {
   constructor(ssb: any, config: any) {
     this.ssb = ssb;
     this.config = config;
-    this.hub = this.ssb.conn.internalConnHub();
     this.hasSsbDb = !!this.ssb.post && !!this.ssb.messagesByType;
     this.closed = true;
     this.lastMessageAt = 0;
@@ -293,7 +290,8 @@ export class ConnScheduler {
       .peersInConnection()
       .filter(peer => {
         const permanent = hasPinged(peer) || isLocal(peer);
-        return !permanent || this.hub.getState(peer[0]) === 'connecting';
+        const state = this.ssb.conn.hub().getState(peer[0]);
+        return !permanent || state === 'connecting';
       })
       .filter(peer => peer[1].stateChange! + 10e3 < Date.now())
       .forEach(([addr]) => this.ssb.conn.disconnect(addr));
@@ -362,7 +360,7 @@ export class ConnScheduler {
             const key = Ref.getKeyFromAddress(address);
             if (this.weBlockThem([address, {key}])) {
               this.ssb.conn.forget(address);
-            } else if (!this.ssb.conn.internalConnDB().has(address)) {
+            } else if (!this.ssb.conn.db().has(address)) {
               this.ssb.conn.stage(address, {key, type: 'pub'});
               this.ssb.conn.remember(address, {
                 key,
@@ -378,7 +376,7 @@ export class ConnScheduler {
 
       // Pause or resume the draining depending on the number of staged pubs
       pull(
-        this.ssb.conn.internalConnStaging().liveEntries(),
+        this.ssb.conn.staging().liveEntries(),
         pull.drain((staged: Array<any>) => {
           const stagedPubs = staged.filter(([, data]) => data.type === 'pub');
           if (stagedPubs.length >= MAX_STAGED_PUBS) {
@@ -482,14 +480,14 @@ export class ConnScheduler {
     if (int.unref) int.unref();
 
     // Upon wakeup, trigger hard reconnect
-    onWakeup(() => this.hub.reset());
+    onWakeup(() => this.ssb.conn.hub().reset());
 
     // Upon network changes, trigger hard reconnect
-    onNetwork(() => this.hub.reset());
+    onNetwork(() => this.ssb.conn.hub().reset());
 
     // Upon some disconnection, attempt to make connections
     pull(
-      this.hub.listen(),
+      this.ssb.conn.hub().listen(),
       pull.filter((ev: HubEvent) => ev.type === 'disconnected'),
       pull.drain(() => this.updateConnectionsSoon(200)),
     );
@@ -501,7 +499,7 @@ export class ConnScheduler {
   @muxrpc('sync')
   public stop = () => {
     if (this.ssb.lan && this.ssb.lan.stop) this.ssb.lan.stop();
-    this.hub.reset();
+    this.ssb.conn.hub().reset();
     this.closed = true;
   };
 }

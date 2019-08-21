@@ -13,18 +13,18 @@ const ping = require('pull-ping');
 export class CONN {
   private readonly ssb: any;
   private readonly config: any;
-  private readonly db: ConnDB;
-  private readonly hub: ConnHub;
-  private readonly staging: ConnStaging;
-  private readonly connQuery: ConnQuery;
+  private readonly _db: ConnDB;
+  private readonly _hub: ConnHub;
+  private readonly _staging: ConnStaging;
+  private readonly _query: ConnQuery;
 
   constructor(ssb: any, cfg: any) {
     this.ssb = ssb;
     this.config = cfg;
-    this.db = new ConnDB({path: this.config.path, writeTimeout: 1e3});
-    this.hub = new ConnHub(this.ssb);
-    this.staging = new ConnStaging();
-    this.connQuery = new ConnQuery(this.db, this.hub, this.staging);
+    this._db = new ConnDB({path: this.config.path, writeTimeout: 1e3});
+    this._hub = new ConnHub(this.ssb);
+    this._staging = new ConnStaging();
+    this._query = new ConnQuery(this._db, this._hub, this._staging);
 
     this.initialize();
   }
@@ -34,16 +34,16 @@ export class CONN {
   private initialize() {
     this.setupCloseHook();
     this.maybeAutoStartScheduler();
-    interpoolGlue(this.db, this.hub, this.staging);
+    interpoolGlue(this._db, this._hub, this._staging);
   }
 
   private setupCloseHook() {
     const that = this;
     this.ssb.close.hook(function(this: any, fn: Function, args: Array<any>) {
       that.stopScheduler();
-      that.db.close();
-      that.hub.close();
-      that.staging.close();
+      that._db.close();
+      that._hub.close();
+      that._staging.close();
       return fn.apply(this, args);
     });
   }
@@ -59,7 +59,7 @@ export class CONN {
   //#region Helper methods
 
   private async startScheduler() {
-    await this.db.loaded();
+    await this._db.loaded();
 
     if (this.ssb.connScheduler) {
       this.ssb.connScheduler.start();
@@ -88,16 +88,16 @@ export class CONN {
 
   @muxrpc('sync')
   public remember = (address: string, data: any = {}) => {
-    this.db.set(address, data);
+    this._db.set(address, data);
   };
 
   @muxrpc('sync')
   public forget = (address: string) => {
-    this.db.delete(address);
+    this._db.delete(address);
   };
 
   @muxrpc('sync')
-  public dbPeers = () => this.db.entries() as Iterable<[string, AddressData]>;
+  public dbPeers = () => this._db.entries() as Iterable<[string, AddressData]>;
 
   @muxrpc('async')
   public connect = (
@@ -112,41 +112,38 @@ export class CONN {
     const cb = (typeof last === 'function' ? last : null) as Callback<any>;
     const data = (typeof b === 'object' ? b : {}) as any;
 
-    this.hub
+    this._hub
       .connect(address, data)
       .then(result => cb && cb(null, result), err => cb && cb(err));
   };
 
   @muxrpc('async')
   public disconnect = (address: string, cb?: Callback<any>) => {
-    this.hub
+    this._hub
       .disconnect(address)
       .then(result => cb && cb(null, result), err => cb && cb(err));
   };
 
   @muxrpc('source')
-  public peers = () => this.hub.liveEntries();
+  public peers = () => this._hub.liveEntries();
 
   @muxrpc('sync')
   public stage = (
     address: string,
     data: Partial<StagedData> = {type: 'internet'},
   ) => {
-    if (!!this.hub.getState(address)) return false;
+    if (!!this._hub.getState(address)) return false;
 
-    return this.staging.stage(address, data);
+    return this._staging.stage(address, data);
   };
 
   @muxrpc('sync')
   public unstage = (address: string) => {
-    return this.staging.unstage(address);
+    return this._staging.unstage(address);
   };
 
   @muxrpc('source')
-  public stagedPeers = () => this.staging.liveEntries();
-
-  @muxrpc('sync')
-  public query = () => this.connQuery;
+  public stagedPeers = () => this._staging.liveEntries();
 
   @muxrpc('sync')
   public start = () => {
@@ -169,13 +166,35 @@ export class CONN {
   };
 
   @muxrpc('sync')
-  public internalConnDB = () => this.db;
+  public db = () => this._db;
 
   @muxrpc('sync')
-  public internalConnHub = () => this.hub;
+  public hub = () => this._hub;
 
   @muxrpc('sync')
-  public internalConnStaging = () => this.staging;
+  public staging = () => this._staging;
 
+  @muxrpc('sync')
+  public query = () => this._query;
+
+  @muxrpc('sync')
+  public internalConnDB = () => {
+    console.error('DEPRECATED conn.internalConnDB(), use conn.db() instead');
+    return this._db;
+  };
+
+  @muxrpc('sync')
+  public internalConnHub = () => {
+    console.error('DEPRECATED conn.internalConnHub(), use conn.hub() instead');
+    return this._hub;
+  };
+
+  @muxrpc('sync')
+  public internalConnStaging = () => {
+    console.error(
+      'DEPRECATED conn.internalConnStaging(), use conn.staging() instead',
+    );
+    return this._staging;
+  };
   //#endregion
 }

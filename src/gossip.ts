@@ -1,6 +1,3 @@
-import ConnDB = require('ssb-conn-db');
-import ConnHub = require('ssb-conn-hub');
-import ConnStaging = require('ssb-conn-staging');
 import {ListenEvent as HubEvent} from 'ssb-conn-hub/lib/types';
 import {Callback, Peer} from './types';
 import {plugin, muxrpc} from 'secret-stack-decorators';
@@ -87,9 +84,6 @@ export class Gossip {
   private readonly ssb: any;
   private readonly notify: any;
   private readonly conn: CONN;
-  private readonly connDB: ConnDB;
-  private readonly connHub: ConnHub;
-  private readonly connStaging: ConnStaging;
 
   /**
    * Timestamp of the latest deprecation warning for gossip.peers()
@@ -100,9 +94,6 @@ export class Gossip {
     this.ssb = ssb;
     this.notify = Notify();
     this.conn = this.ssb.conn;
-    this.connDB = this.conn.internalConnDB();
-    this.connHub = this.conn.internalConnHub();
-    this.connStaging = this.conn.internalConnStaging();
     this.latestWarning = 0;
 
     this.setupConnectionListeners();
@@ -111,7 +102,7 @@ export class Gossip {
 
   private setupConnectionListeners() {
     pull(
-      this.connHub.listen(),
+      this.conn.hub().listen(),
       pull.drain((ev: HubEvent) => {
         if (ev.type === 'connecting-failed') this.onConnectingFailed(ev);
         if (ev.type === 'connected') this.onConnected(ev);
@@ -125,7 +116,7 @@ export class Gossip {
       state: ev.type,
       address: ev.address,
       key: ev.key,
-      ...this.connDB.get(ev.address),
+      ...this.conn.db().get(ev.address),
     };
     this.notify({type: 'connect-failure', peer});
   }
@@ -135,9 +126,9 @@ export class Gossip {
       state: ev.type,
       address: ev.address,
       key: ev.key,
-      ...this.connDB.get(ev.address),
+      ...this.conn.db().get(ev.address),
     } as Peer;
-    if (!this.connDB.has(ev.address)) peer.source = inferSource(ev.address);
+    if (!this.conn.db().has(ev.address)) peer.source = inferSource(ev.address);
     this.notify({type: 'connect', peer});
   }
 
@@ -146,13 +137,13 @@ export class Gossip {
       state: ev.type,
       address: ev.address,
       key: ev.key,
-      ...this.connDB.get(ev.address),
+      ...this.conn.db().get(ev.address),
     } as Peer;
     this.notify({type: 'disconnect', peer});
   }
 
   private idToAddr(id: any) {
-    const addr = this.connDB.getAddressForId(id as string) as string;
+    const addr = this.conn.db().getAddressForId(id as string) as string;
     if (!addr) {
       throw new Error('no known address for peer:' + id);
     }
@@ -165,17 +156,19 @@ export class Gossip {
       console.trace('DEPRECATED gossip.peers(), use ssb-conn instead');
       this.latestWarning = Date.now();
     }
-    const peers = Array.from(this.connDB.entries()).map(([address, data]) => {
-      return {
-        ...data,
-        address,
-        state: this.connHub.getState(address),
-      };
-    });
+    const peers = Array.from(this.conn.db().entries()).map(
+      ([address, data]) => {
+        return {
+          ...data,
+          address,
+          state: this.conn.hub().getState(address),
+        };
+      },
+    );
 
     // Add peers that are connected but are not in the cold database
-    for (const [address, data] of this.connHub.entries()) {
-      if (!this.connDB.has(address)) {
+    for (const [address, data] of this.conn.hub().entries()) {
+      if (!this.conn.db().has(address)) {
         const [, parsed] = validateAddr(address);
         peers.push({
           ...data,
@@ -195,7 +188,7 @@ export class Gossip {
   public get: (addr: Peer | string) => any = (addr: Peer | string) => {
     console.error('DEPRECATED gossip.get() was called. Use ssb-conn instead');
     if (ref.isFeed(addr)) {
-      for (let [address, data] of this.connDB.entries()) {
+      for (let [address, data] of this.conn.db().entries()) {
         if (data.key === addr) {
           return {...data, address};
         }
@@ -203,12 +196,12 @@ export class Gossip {
       return undefined;
     }
     const [addressString] = validateAddr(addr);
-    const peer = this.connDB.get(addressString);
+    const peer = this.conn.db().get(addressString);
     if (!peer) return undefined;
     else {
       return {
         address: addressString,
-        state: this.connHub.getState(addressString),
+        state: this.conn.hub().getState(addressString),
         ...peer,
       };
     }
@@ -228,8 +221,8 @@ export class Gossip {
     }
 
     this.add(addressString, 'manual');
-    const stagedData = this.conn.internalConnStaging().get(addressString) || {};
-    const dbData = this.conn.internalConnDB().get(addressString) || {};
+    const stagedData = this.conn.staging().get(addressString) || {};
+    const dbData = this.conn.db().get(addressString) || {};
     const data = {...dbData, ...stagedData};
 
     this.conn.connect(addressString, data, cb);
@@ -273,10 +266,10 @@ export class Gossip {
       return;
     }
 
-    if (this.connDB.has(addressString)) {
-      return this.connDB.get(addressString);
+    if (this.conn.db().has(addressString)) {
+      return this.conn.db().get(addressString);
     } else {
-      this.connDB.set(addressString, {
+      this.conn.db().set(addressString, {
         host: parsed.host,
         port: parsed.port,
         key: parsed.key,
@@ -287,12 +280,12 @@ export class Gossip {
         type: 'discover',
         peer: {
           ...parsed,
-          state: this.connHub.getState(addressString),
+          state: this.conn.hub().getState(addressString),
           source: source || 'manual',
         },
         source: source || 'manual',
       });
-      return this.connDB.get(addressString) || parsed;
+      return this.conn.db().get(addressString) || parsed;
     }
   };
 
@@ -303,12 +296,12 @@ export class Gossip {
     );
     const [addressString] = validateAddr(addr);
 
-    this.connHub.disconnect(addressString);
-    this.connStaging.unstage(addressString);
+    this.conn.hub().disconnect(addressString);
+    this.conn.staging().unstage(addressString);
 
-    const peer = this.connDB.get(addressString);
+    const peer = this.conn.db().get(addressString);
     if (!peer) return;
-    this.connDB.delete(addressString);
+    this.conn.db().delete(addressString);
     this.notify({type: 'remove', peer: peer});
   };
 
@@ -320,7 +313,7 @@ export class Gossip {
     console.error(
       'DEPRECATED gossip.reconnect() was called. Use ssb-conn instead',
     );
-    this.connHub.reset();
+    this.conn.hub().reset();
   };
 
   @muxrpc('sync')

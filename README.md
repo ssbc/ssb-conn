@@ -58,10 +58,13 @@ Under `ssb.conn.*` you can call any of these APIs in your local peer.
 | **`stage(addr, data?)`** | `sync` | Registers a suggested connection to a new peer, known by its multiserver address `addr` and additional optional `data` (as an object). |
 | **`unstage(addr)`** | `sync` | Unregisters a suggested connection the peer known by its multiserver address `addr`. |
 | **`stagedPeers()`** | `source` | A pull-stream that emits an array of all staged "entries" (see definition below) whenever any staging status updates (upon stage() or unstage()). |
-| **`query()`** | `sync` | Returns an instance of [ConnQuery](https://github.com/staltz/ssb-conn-query). |
 | **`start()`** | `sync` | Triggers the start of the connection scheduler in CONN. |
 | **`stop()`** | `sync` | Stops the CONN scheduler if it is currently active. |
 | **`ping()`** | `duplex` | A duplex pull-stream for periodically pinging with peers, fully compatible with `ssb.gossip.ping`. |
+| **`db()`** | `sync` | Returns the instance of [ConnDB](https://github.com/staltz/ssb-conn-db) currently in use. |
+| **`hub()`** | `sync` | Returns the instance of [ConnHub](https://github.com/staltz/ssb-conn-hub) currently in use. |
+| **`staging()`** | `sync` | Returns the instance of [ConnStaging](https://github.com/staltz/ssb-conn-staging) currently in use. |
+| **`query()`** | `sync` | Returns the instance of [ConnQuery](https://github.com/staltz/ssb-conn-query) currently in use. |
 
 An "entry" is a (tuple) array with a multiserver address (string that [follows some rules](https://github.com/dominictarr/multiserver-address)) and data (an object):
 
@@ -207,12 +210,6 @@ module.exports = [CONN, ConnScheduler, Gossip]
 ```
 
 That array is a valid secret-stack plugin which you can `.use()` in ssb-server.
-
-**Pro tip:** when implementing your ConnScheduler, you have access to `ssb.conn.*` APIs, but if you need more precision, you can access lower level APIs belonging to ConnDB, ConnHub, and ConnStaging:
-
-- `ssb.conn.internalConnDB().*`
-- `ssb.conn.internalConnHub().*`
-- `ssb.conn.internalConnStaging().*`
 
 <ul></ul>
 

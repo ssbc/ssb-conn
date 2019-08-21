@@ -16,7 +16,7 @@ tape('CONN refuses to stage an already connected peer', t => {
     const stagingResult = ssb.conn.stage(address, {mode: 'internet'});
     t.equals(stagingResult, false, 'stage() should refuse');
 
-    const entries1 = Array.from(ssb.conn.internalConnStaging().entries());
+    const entries1 = Array.from(ssb.conn.staging().entries());
     t.equals(entries1.length, 0, 'there is nothing in staging');
 
     t.end();
@@ -31,7 +31,7 @@ tape('automatically unstage upon connHub "connected" event', t => {
   const result1 = ssb.conn.stage(address, {mode: 'internet', address});
   t.equals(result1, true, 'stage() succeeds');
 
-  const entries1 = Array.from(ssb.conn.internalConnStaging().entries());
+  const entries1 = Array.from(ssb.conn.staging().entries());
   t.equals(entries1.length, 1, 'there is one address in staging');
   const [actualAddress] = entries1[0];
   t.equals(actualAddress, TEST_ADDR, 'staged address is what we expected');
@@ -40,7 +40,7 @@ tape('automatically unstage upon connHub "connected" event', t => {
     t.error(err, 'no error');
     t.ok(result, 'connect was succesful');
 
-    const entries2 = Array.from(ssb.conn.internalConnStaging().entries());
+    const entries2 = Array.from(ssb.conn.staging().entries());
     t.equals(entries2.length, 0, 'there is nothing in staging');
 
     t.end();
@@ -55,7 +55,7 @@ tape('unstage only exactly what connHub "connected" event informed', t => {
   const result1 = ssb.conn.stage(address, {mode: 'internet', address});
   t.equals(result1, true, 'stage() succeeds');
 
-  const entries1 = Array.from(ssb.conn.internalConnStaging().entries());
+  const entries1 = Array.from(ssb.conn.staging().entries());
   t.equals(entries1.length, 1, 'there is one address in staging');
   const [actualAddress] = entries1[0];
   t.equals(actualAddress, TEST_ADDR, 'staged address is what we expected');
@@ -64,7 +64,7 @@ tape('unstage only exactly what connHub "connected" event informed', t => {
     t.error(err, 'no error');
     t.ok(result, 'connect to unrelated random peer was succesful');
 
-    const entries2 = Array.from(ssb.conn.internalConnStaging().entries());
+    const entries2 = Array.from(ssb.conn.staging().entries());
     t.equals(entries2.length, 1, 'there is (still) one address in staging');
 
     t.end();
