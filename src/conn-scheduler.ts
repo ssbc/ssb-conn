@@ -339,52 +339,56 @@ export class ConnScheduler {
     if (this.config.gossip && this.config.gossip.pub === false) return;
     if (this.config.gossip && this.config.gossip.autoPopulate === false) return;
 
-    type PubContent = {address?: string};
-    const MAX_STAGED_PUBS = 3;
-    const pausable = Pausable();
+    setTimeout(() => {
+      type PubContent = {address?: string};
+      const MAX_STAGED_PUBS = 3;
+      const pausable = Pausable();
 
-    pull(
-      this.ssb.messagesByType({type: 'pub', live: true, keys: false}),
-      pull.filter((msg: any) => !msg.sync),
-      pull.filter(
-        (msg: Msg<PubContent>['value']) =>
-          msg.content &&
-          msg.content.address &&
-          Ref.isAddress(msg.content.address),
-      ),
-      pausable,
-      pull.drain((msg: Msg<PubContent>['value']) => {
-        try {
-          const address = Ref.toMultiServerAddress(msg.content.address!);
-          const key = Ref.getKeyFromAddress(address);
-          if (this.weBlockThem([address, {key}])) {
-            this.ssb.conn.forget(address);
-          } else if (!this.ssb.conn.internalConnDB().has(address)) {
-            this.ssb.conn.stage(address, {key, type: 'pub'});
-            this.ssb.conn.remember(address, {
-              key,
-              type: 'pub',
-              autoconnect: false,
-            });
+      pull(
+        this.ssb.messagesByType({type: 'pub', live: true, keys: false}),
+        pull.filter((msg: any) => !msg.sync),
+        // Don't drain that fast, so to give other DB draining tasks priority
+        pull.asyncMap((x: any, cb: any) => setTimeout(() => cb(null, x), 250)),
+        pull.filter(
+          (msg: Msg<PubContent>['value']) =>
+            msg.content &&
+            msg.content.address &&
+            Ref.isAddress(msg.content.address),
+        ),
+        pausable,
+        pull.drain((msg: Msg<PubContent>['value']) => {
+          try {
+            const address = Ref.toMultiServerAddress(msg.content.address!);
+            const key = Ref.getKeyFromAddress(address);
+            if (this.weBlockThem([address, {key}])) {
+              this.ssb.conn.forget(address);
+            } else if (!this.ssb.conn.internalConnDB().has(address)) {
+              this.ssb.conn.stage(address, {key, type: 'pub'});
+              this.ssb.conn.remember(address, {
+                key,
+                type: 'pub',
+                autoconnect: false,
+              });
+            }
+          } catch (err) {
+            debug('cannot process discovered pub because: %s', err);
           }
-        } catch (err) {
-          debug('cannot process discovered pub because: %s', err);
-        }
-      }),
-    );
+        }),
+      );
 
-    // Pause or resume the draining depending on the number of staged pubs
-    pull(
-      this.ssb.conn.internalConnStaging().liveEntries(),
-      pull.drain((staged: Array<any>) => {
-        const stagedPubs = staged.filter(([, data]) => data.type === 'pub');
-        if (stagedPubs.length >= MAX_STAGED_PUBS) {
-          pausable.pause();
-        } else {
-          pausable.resume();
-        }
-      }),
-    );
+      // Pause or resume the draining depending on the number of staged pubs
+      pull(
+        this.ssb.conn.internalConnStaging().liveEntries(),
+        pull.drain((staged: Array<any>) => {
+          const stagedPubs = staged.filter(([, data]) => data.type === 'pub');
+          if (stagedPubs.length >= MAX_STAGED_PUBS) {
+            pausable.pause();
+          } else {
+            pausable.resume();
+          }
+        }),
+      );
+    }, 1000);
   }
 
   private setupBluetoothDiscovery() {
