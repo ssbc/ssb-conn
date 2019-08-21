@@ -25,8 +25,12 @@ export function interpoolGlue(db: ConnDB, hub: ConnHub, staging: ConnStaging) {
   }
 
   function onConnecting(ev: HubEvent) {
-    staging.unstage(ev.address);
-    db.update(ev.address, {stateChange: Date.now()});
+    const addr = ev.address;
+    const stagedData = staging.get(addr);
+    staging.unstage(addr);
+    db.update(addr, {stateChange: Date.now()});
+    const dbData = db.get(addr);
+    hub.update(addr, {...dbData, ...stagedData});
   }
 
   function onConnectingFailed(ev: HubEvent) {
@@ -38,9 +42,13 @@ export function interpoolGlue(db: ConnDB, hub: ConnHub, staging: ConnStaging) {
   }
 
   function onConnected(ev: HubEvent) {
-    staging.unstage(ev.address);
-    db.update(ev.address, {stateChange: Date.now(), failure: 0});
-    if (ev.details.isClient) setupPing(ev.address, ev.details.rpc);
+    const addr = ev.address;
+    const stagedData = staging.get(addr);
+    staging.unstage(addr);
+    db.update(addr, {stateChange: Date.now(), failure: 0});
+    const dbData = db.get(addr);
+    hub.update(addr, {...dbData, ...stagedData});
+    if (ev.details.isClient) setupPing(addr, ev.details.rpc);
   }
 
   function onDisconnecting(ev: HubEvent) {

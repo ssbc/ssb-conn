@@ -228,8 +228,11 @@ export class Gossip {
     }
 
     this.add(addressString, 'manual');
+    const stagedData = this.conn.internalConnStaging().get(addressString) || {};
+    const dbData = this.conn.internalConnDB().get(addressString) || {};
+    const data = {...dbData, ...stagedData};
 
-    this.conn.connect(addressString, cb);
+    this.conn.connect(addressString, data, cb);
   };
 
   @muxrpc('async')
