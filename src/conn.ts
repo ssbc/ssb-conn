@@ -102,14 +102,15 @@ export class CONN {
   @muxrpc('async')
   public connect = (
     address: string,
-    second: Record<string, any> | null | undefined | Callback<any>,
-    third?: Callback<any>,
+    b?: Record<string, any> | null | undefined | Callback<any>,
+    c?: Callback<any>,
   ) => {
-    if (typeof second === 'function' && typeof third === 'function') {
+    if (c && (typeof b === 'function' || !b)) {
       throw new Error('CONN.connect() received incorrect arguments');
     }
-    const cb = (typeof third === 'function' ? third : second) as Callback<any>;
-    const data = (typeof third === 'function' ? second : undefined) as any;
+    const last = !!c ? c : b;
+    const cb = (typeof last === 'function' ? last : null) as Callback<any>;
+    const data = (typeof b === 'object' ? b : {}) as any;
 
     this.hub
       .connect(address, data)
