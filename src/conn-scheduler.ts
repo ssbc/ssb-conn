@@ -170,7 +170,7 @@ export class ConnScheduler {
     peersUp
       .z(sortByStateChange)
       .z(take(excess))
-      .forEach(([addr]) => this.hub.disconnect(addr));
+      .forEach(([addr]) => this.ssb.conn.disconnect(addr));
 
     // Connect to suitable candidates
     peersDown
@@ -186,7 +186,7 @@ export class ConnScheduler {
           : peers.z(sortByStateChange),
       )
       .z(take(freeSlots))
-      .forEach(([addr, data]) => this.hub.connect(addr, data));
+      .forEach(([addr, data]) => this.ssb.conn.connect(addr, data));
   }
 
   private updateConnectionsNow() {
@@ -262,14 +262,14 @@ export class ConnScheduler {
       .peersConnectable('staging')
       .filter(this.weFollowThem)
       .z(take(5))
-      .forEach(([addr, data]) => this.hub.connect(addr, data));
+      .forEach(([addr, data]) => this.ssb.conn.connect(addr, data));
 
     // Purge connected peers that are now blocked
     this.ssb.conn
       .query()
       .peersInConnection()
       .filter(this.weBlockThem)
-      .forEach(([addr]) => this.hub.disconnect(addr));
+      .forEach(([addr]) => this.ssb.conn.disconnect(addr));
 
     // Purge some old staged LAN peers
     this.ssb.conn
@@ -296,7 +296,7 @@ export class ConnScheduler {
         return !permanent || this.hub.getState(peer[0]) === 'connecting';
       })
       .filter(peer => peer[1].stateChange! + 10e3 < Date.now())
-      .forEach(([addr]) => this.hub.disconnect(addr));
+      .forEach(([addr]) => this.ssb.conn.disconnect(addr));
 
     // Purge an internet connection after it has been up for 1h
     this.ssb.conn
@@ -304,7 +304,7 @@ export class ConnScheduler {
       .peersConnected()
       .filter(peer => peer[1].type !== 'bt' && peer[1].type !== 'lan')
       .filter(peer => peer[1].stateChange! + 1 * hour < Date.now())
-      .forEach(([addr]) => this.hub.disconnect(addr));
+      .forEach(([addr]) => this.ssb.conn.disconnect(addr));
   }
 
   private updateConnectionsSoon(period: number = 1000) {
@@ -413,7 +413,7 @@ export class ConnScheduler {
             key: btPeer.id,
           };
           if (this.weFollowThem([address, data])) {
-            this.hub.connect(address, data);
+            this.ssb.conn.connect(address, data);
           } else {
             this.ssb.conn.stage(address, data);
           }
@@ -439,7 +439,7 @@ export class ConnScheduler {
           verified,
         };
         if (this.weFollowThem([address, data])) {
-          this.hub.connect(address, data);
+          this.ssb.conn.connect(address, data);
         } else {
           this.ssb.conn.stage(address, data);
         }
