@@ -28,6 +28,9 @@ export function interpoolGlue(db: ConnDB, hub: ConnHub, staging: ConnStaging) {
     const addr = ev.address;
     const stagedData = staging.get(addr);
     staging.unstage(addr);
+    for (const [a, d] of staging.entries()) {
+      if (d.key && d.key === ev.key) staging.unstage(a);
+    }
     db.update(addr, {stateChange: Date.now()});
     const dbData = db.get(addr);
     hub.update(addr, {...dbData, ...stagedData});
@@ -45,6 +48,9 @@ export function interpoolGlue(db: ConnDB, hub: ConnHub, staging: ConnStaging) {
     const addr = ev.address;
     const stagedData = staging.get(addr);
     staging.unstage(addr);
+    for (const [a, d] of staging.entries()) {
+      if (d.key && d.key === ev.key) staging.unstage(a);
+    }
     db.update(addr, {stateChange: Date.now(), failure: 0});
     const dbData = db.get(addr);
     hub.update(addr, {...dbData, ...stagedData});
