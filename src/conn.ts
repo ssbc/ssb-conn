@@ -133,6 +133,11 @@ export class CONN {
     data: Partial<StagedData> = {type: 'internet'},
   ) => {
     if (!!this._hub.getState(address)) return false;
+    if (data.key) {
+      for (const other of this._hub.entries()) {
+        if (other[1].key === data.key) return false;
+      }
+    }
 
     return this._staging.stage(address, data);
   };
