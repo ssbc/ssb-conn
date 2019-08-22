@@ -25,15 +25,15 @@ export function interpoolGlue(db: ConnDB, hub: ConnHub, staging: ConnStaging) {
   }
 
   function onConnecting(ev: HubEvent) {
-    const addr = ev.address;
-    const stagedData = staging.get(addr);
-    staging.unstage(addr);
-    for (const [a, d] of staging.entries()) {
-      if (d.key && d.key === ev.key) staging.unstage(a);
+    const address = ev.address;
+    const stagedData = staging.get(address);
+    staging.unstage(address);
+    for (const [addr, data] of staging.entries()) {
+      if (data.key && data.key === ev.key) staging.unstage(addr);
     }
-    db.update(addr, {stateChange: Date.now()});
-    const dbData = db.get(addr);
-    hub.update(addr, {...dbData, ...stagedData});
+    db.update(address, {stateChange: Date.now()});
+    const dbData = db.get(address);
+    hub.update(address, {...dbData, ...stagedData});
   }
 
   function onConnectingFailed(ev: HubEvent) {
@@ -45,16 +45,16 @@ export function interpoolGlue(db: ConnDB, hub: ConnHub, staging: ConnStaging) {
   }
 
   function onConnected(ev: HubEvent) {
-    const addr = ev.address;
-    const stagedData = staging.get(addr);
-    staging.unstage(addr);
-    for (const [a, d] of staging.entries()) {
-      if (d.key && d.key === ev.key) staging.unstage(a);
+    const address = ev.address;
+    const stagedData = staging.get(address);
+    staging.unstage(address);
+    for (const [addr, data] of staging.entries()) {
+      if (data.key && data.key === ev.key) staging.unstage(addr);
     }
-    db.update(addr, {stateChange: Date.now(), failure: 0});
-    const dbData = db.get(addr);
-    hub.update(addr, {...dbData, ...stagedData});
-    if (ev.details.isClient) setupPing(addr, ev.details.rpc);
+    db.update(address, {stateChange: Date.now(), failure: 0});
+    const dbData = db.get(address);
+    hub.update(address, {...dbData, ...stagedData});
+    if (ev.details.isClient) setupPing(address, ev.details.rpc);
   }
 
   function onDisconnecting(ev: HubEvent) {
