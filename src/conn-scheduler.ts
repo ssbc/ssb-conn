@@ -150,7 +150,8 @@ export class ConnScheduler {
 
   private weFollowThem = ([_addr, data]: [string, {key?: string}]) => {
     if (!data || !data.key) return false;
-    return this.hops[data.key] > 0;
+    const h = this.hops[data.key];
+    return h > 0 && h <= 1;
   };
 
   // Utility to connect to bunch of peers, or disconnect if over quota
@@ -209,7 +210,7 @@ export class ConnScheduler {
 
     // If there are no peers, then try *any* connection ASAP
     if (this.ssb.conn.query().peersInConnection().length === 0) {
-      this.updateTheseConnections(_p => true, {
+      this.updateTheseConnections(() => true, {
         quota: 1,
         backoffStep: 1e3,
         backoffMax: 6e3,
