@@ -108,13 +108,13 @@ export class ConnScheduler {
           this.lastMessageAt = Date.now();
         }
         if (msg.value.content && msg.value.content.type === 'contact') {
-          this.updateHops();
+          this.loadHops();
         }
       });
     }
   }
 
-  private updateHops() {
+  private loadHops() {
     if (!this.ssb.friends || !this.ssb.friends.hops) {
       debug('Warning: ssb-friends is missing, scheduling will miss some info');
       return;
@@ -187,11 +187,7 @@ export class ConnScheduler {
       .forEach(([addr, data]) => this.ssb.conn.connect(addr, data));
   }
 
-  private updateConnectionsNow() {
-    if (this.hasSsbDb && !this.ssb.ready()) return;
-    if (this.isCurrentlyDownloading()) return;
-    if (this.isLoadingHops) return;
-
+  private updateStagingNow() {
     // Stage all db peers with autoconnect=false
     this.ssb.conn
       .query()
@@ -199,6 +195,24 @@ export class ConnScheduler {
       .filter(([, data]) => data.autoconnect === false)
       .forEach(([addr, data]) => this.ssb.conn.stage(addr, data));
 
+    // Purge some old staged LAN peers
+    this.ssb.conn
+      .query()
+      .peersConnectable('staging')
+      .filter(([, data]) => data.type === 'lan')
+      .filter(([, data]) => data.stagingUpdated! + 10e3 < Date.now())
+      .forEach(([addr]) => this.ssb.conn.unstage(addr));
+
+    // Purge some old staged Bluetooth peers
+    this.ssb.conn
+      .query()
+      .peersConnectable('staging')
+      .filter(([, data]) => data.type === 'bt')
+      .filter(([, data]) => data.stagingUpdated! + 30e3 < Date.now())
+      .forEach(([addr]) => this.ssb.conn.unstage(addr));
+  }
+
+  private updateHubNow() {
     if (this.conf('seed', true)) {
       this.updateTheseConnections(p => p[1].source === 'seed', {
         quota: 3,
@@ -269,22 +283,6 @@ export class ConnScheduler {
       .filter(this.weBlockThem)
       .forEach(([addr]) => this.ssb.conn.disconnect(addr));
 
-    // Purge some old staged LAN peers
-    this.ssb.conn
-      .query()
-      .peersConnectable('staging')
-      .filter(([, data]) => data.type === 'lan')
-      .filter(([, data]) => data.stagingUpdated! + 10e3 < Date.now())
-      .forEach(([addr]) => this.ssb.conn.unstage(addr));
-
-    // Purge some old staged Bluetooth peers
-    this.ssb.conn
-      .query()
-      .peersConnectable('staging')
-      .filter(([, data]) => data.type === 'bt')
-      .filter(([, data]) => data.stagingUpdated! + 30e3 < Date.now())
-      .forEach(([addr]) => this.ssb.conn.unstage(addr));
-
     // Purge some ongoing frustrating connection attempts
     this.ssb.conn
       .query()
@@ -306,7 +304,16 @@ export class ConnScheduler {
       .forEach(([addr]) => this.ssb.conn.disconnect(addr));
   }
 
-  private updateConnectionsSoon(period: number = 1000) {
+  private updateNow() {
+    if (this.hasSsbDb && !this.ssb.ready()) return;
+    if (this.isCurrentlyDownloading()) return;
+    if (this.isLoadingHops) return;
+
+    this.updateStagingNow();
+    this.updateHubNow();
+  }
+
+  private updateSoon(period: number = 1000) {
     if (this.closed) return;
     if (this.hasScheduledAnUpdate) return;
 
@@ -314,7 +321,7 @@ export class ConnScheduler {
     const fuzzyPeriod = period * 0.5 + period * Math.random();
     this.hasScheduledAnUpdate = true;
     const timer = setTimeout(() => {
-      this.updateConnectionsNow();
+      this.updateNow();
       this.hasScheduledAnUpdate = false;
     }, fuzzyPeriod);
     if (timer.unref) timer.unref();
@@ -466,7 +473,7 @@ export class ConnScheduler {
     }
 
     // Upon init, load some follow-and-blocks data
-    this.updateHops();
+    this.loadHops();
 
     // Upon init, populate with seeds
     this.populateWithSeeds();
@@ -477,7 +484,7 @@ export class ConnScheduler {
     this.setupBluetoothDiscovery();
 
     // Upon regular time intervals, attempt to make connections
-    const int = setInterval(() => this.updateConnectionsSoon(), 2e3);
+    const int = setInterval(() => this.updateSoon(), 2e3);
     if (int.unref) int.unref();
 
     // Upon wakeup, trigger hard reconnect
@@ -490,11 +497,11 @@ export class ConnScheduler {
     pull(
       this.ssb.conn.hub().listen(),
       pull.filter((ev: HubEvent) => ev.type === 'disconnected'),
-      pull.drain(() => this.updateConnectionsSoon(200)),
+      pull.drain(() => this.updateSoon(200)),
     );
 
     // Upon init, attempt to make some connections
-    this.updateConnectionsSoon();
+    this.updateSoon();
   };
 
   @muxrpc('sync')
