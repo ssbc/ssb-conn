@@ -232,9 +232,9 @@ export class ConnScheduler {
       });
     }
 
-    // Connect to at least 2 rooms, prioritized over pubs
+    // Connect to rooms, up to 10 of them, prioritized over pubs
     this.updateTheseConnections(p => p[1].type === 'room', {
-      quota: 2,
+      quota: 10,
       backoffStep: 5e3,
       backoffMax: 5 * minute,
       groupMin: 5e3,
