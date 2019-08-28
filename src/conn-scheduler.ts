@@ -192,8 +192,16 @@ export class ConnScheduler {
     this.ssb.conn
       .query()
       .peersConnectable('db')
+      .filter(p => !this.weBlockThem(p))
       .filter(([, data]) => data.autoconnect === false)
       .forEach(([addr, data]) => this.ssb.conn.stage(addr, data));
+
+    // Purge staged peers that are now blocked
+    this.ssb.conn
+      .query()
+      .peersConnectable('staging')
+      .filter(this.weBlockThem)
+      .forEach(([addr]) => this.ssb.conn.unstage(addr));
 
     // Purge some old staged LAN peers
     this.ssb.conn
