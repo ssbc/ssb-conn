@@ -108,13 +108,13 @@ export class ConnScheduler {
           this.lastMessageAt = Date.now();
         }
         if (msg.value.content && msg.value.content.type === 'contact') {
-          this.loadHops();
+          this.loadHops(() => this.updateNow());
         }
       });
     }
   }
 
-  private loadHops() {
+  private loadHops(doneCallback?: () => void) {
     if (!this.ssb.friends || !this.ssb.friends.hops) {
       debug('Warning: ssb-friends is missing, scheduling will miss some info');
       return;
@@ -128,6 +128,7 @@ export class ConnScheduler {
       }
       this.hops = hops;
       this.isLoadingHops = false;
+      if (doneCallback) doneCallback();
     });
   }
 
