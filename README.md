@@ -74,24 +74,42 @@ An "entry" is a (tuple) array of form:
  where: 
  - `addr` is a multiserver address (a **string** that [follows some rules](https://github.com/dominictarr/multiserver-address))
  - `data` is an **object** with additional information about the peer (fields marked 🔷 are important and often used, fields marked 🔹 come from CONN, fields marked 🔸 are ad-hoc and added by various other modules, and fields suffixed with `?` are not always present):
-   - 🔷 `key: string`: the peer's public key / feedId
-   - 🔷 `state?: 'connecting' | 'connected' | 'disconnecting'`: (only from `peers()`) the peer's current connection status
-   - 🔷 `type?: string`: what type of peer this is; it can be any string, but often is either `'lan'`, `'bt'`, `'pub'`, `'room'`, `'room-endpoint'`, `'dht'`
-   - 🔹 `inferredType?: 'bt' | 'lan' | 'dht' | 'internet' | 'tunnel'`: (only from `peers()`) when there is no `type` field, e.g. when a new and unknown peer initiates a client connection with us (as a server), then ConnHub makes a guess what type it is
-   - 🔹 `birth?: number`: Unix timestamp for when this peer was added to ConnDB
-   - 🔹 `stateChange?: number`: Unix timestamp for the last time the field `state` was changed; this is stored in ConnDB
-   - 🔹 `hubBirth?: number`: Unix timestamp for when this peer was added to ConnHub
-   - 🔹 `hubUpdated?: number`: Unix timestamp for when this data object was last updated in ConnHub
-   - 🔹 `stagingBirth?: number`: Unix timestamp for when this peer was added to ConnStaging
-   - 🔹 `stagingUpdated?: number`: Unix timestamp for when this data object was last updated in ConnStaging
-   - 🔹 `autoconnect?: boolean`: indicates whether this peer should be considered for connection in the scheduler
-   - 🔹 `failure?: number`: typically in ConnDB, this is the number of connection errors since the last successful connection
-   - 🔹 `duration?: object`: typically in ConnDB, this is a [statistics](https://www.npmjs.com/package/statistics) object to measure the duration of connection with this peer
-   - 🔹 `ping?: object`: typically in ConnDB, this is [statistics](https://www.npmjs.com/package/statistics) object of various ping health measurements
-   - 🔹 `pool?: 'db' | 'hub' | 'staging'`: this only appears in ConnQuery APIs, and indicates from which pool (ConnDB or ConnHub or ConnStaging) was this peer picked
-   - 🔸 `name?: string`: a nickname for this peer, when there isn't an [ssb-about](https://github.com/ssbc/ssb-about) name
-   - 🔸 `room?: string`: (only if `type = 'room-endpoint'`) the public key of the [room](https://github.com/staltz/ssb-room) server where this peer is in
-   - 🔸 `onlineCount?: number`: (only if `type = 'room'`) the number of room endpoints currently connected to this room
+
+🔷 `key: string`: the peer's public key / feedId
+
+🔷 `state?: 'connecting' | 'connected' | 'disconnecting'`: (only from `peers()`) the peer's current connection status
+
+🔷 `type?: string`: what type of peer this is; it can be any string, but often is either `'lan'`, `'bt'`, `'pub'`, `'room'`, `'room-endpoint'`, `'dht'`
+
+🔹 `inferredType?: 'bt' | 'lan' | 'dht' | 'internet' | 'tunnel'`: (only from `peers()`) when there is no `type` field, e.g. when a new and unknown peer initiates a client connection with us (as a server), then ConnHub makes a guess what type it is
+
+🔹 `birth?: number`: Unix timestamp for when this peer was added to ConnDB
+
+🔹 `stateChange?: number`: Unix timestamp for the last time the field `state` was changed; this is stored in ConnDB
+
+🔹 `hubBirth?: number`: Unix timestamp for when this peer was added to ConnHub
+
+🔹 `hubUpdated?: number`: Unix timestamp for when this data object was last updated in ConnHub
+
+🔹 `stagingBirth?: number`: Unix timestamp for when this peer was added to ConnStaging
+
+🔹 `stagingUpdated?: number`: Unix timestamp for when this data object was last updated in ConnStaging
+
+🔹 `autoconnect?: boolean`: indicates whether this peer should be considered for connection in the scheduler
+
+🔹 `failure?: number`: typically in ConnDB, this is the number of connection errors since the last successful connection
+
+🔹 `duration?: object`: typically in ConnDB, this is a [statistics](https://www.npmjs.com/package/statistics) object to measure the duration of connection with this peer
+
+🔹 `ping?: object`: typically in ConnDB, this is [statistics](https://www.npmjs.com/package/statistics) object of various ping health measurements
+
+🔹 `pool?: 'db' | 'hub' | 'staging'`: this only appears in ConnQuery APIs, and indicates from which pool (ConnDB or ConnHub or ConnStaging) was this peer picked
+
+🔸 `name?: string`: a nickname for this peer, when there isn't an [ssb-about](https://github.com/ssbc/ssb-about) name
+
+🔸 `room?: string`: (only if `type = 'room-endpoint'`) the public key of the [room](https://github.com/staltz/ssb-room) server where this peer is in
+
+🔸 `onlineCount?: number`: (only if `type = 'room'`) the number of room endpoints currently connected to this room
    
 ## Gossip compatibility
 
