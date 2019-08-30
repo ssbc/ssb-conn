@@ -66,11 +66,30 @@ Under `ssb.conn.*` you can call any of these APIs in your local peer.
 | **`staging()`** | `sync` | Returns the instance of [ConnStaging](https://github.com/staltz/ssb-conn-staging) currently in use. |
 | **`query()`** | `sync` | Returns the instance of [ConnQuery](https://github.com/staltz/ssb-conn-query) currently in use. |
 
-An "entry" is a (tuple) array with a multiserver address (string that [follows some rules](https://github.com/dominictarr/multiserver-address)) and data (an object):
+An "entry" is a (tuple) array of form:
 
 ```javascript
 [addr, data]
 ```
+ where: 
+ - `addr` (String) is a multiserver address (string that [follows some rules](https://github.com/dominictarr/multiserver-address))
+ - `data` (Object) contains additional information, depending on the method:
+
+   - `peers()` data:
+     - `key` - the peers public key / feedId
+     - `hubBirth` - unix time for when this peer was asdded to the hub
+     - `hubUpdated` - unix time for when this peer was last updated
+     - `state` - `(connecting | connected | disconnecting)`
+     - `inferredType` - `(lan | ???)`
+   - `stagedPeers()` data:
+     - `key` - the peers public key / feedId
+     - `autoconnect` - boolean about whether to connect automatically
+     - `birth` - unix time ... ???
+     - `stagingBirth`  - unix time for when this peer became known of
+     - `stagingUpdated` - unix time for when this peer was last updated
+     - `pool` - where this peer was discovered `(db | ???)`
+     - `type` - what type of peer `(pub | ???)`
+   - `dbPeers()` data: ??? same as `peers()` ???
 
 ## Gossip compatibility
 
