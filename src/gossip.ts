@@ -97,7 +97,10 @@ export class Gossip {
     this.latestWarning = 0;
 
     this.setupConnectionListeners();
-    if (cfg.conn && cfg.conn.autostart !== false) {
+    if (cfg.conn && cfg.conn.autostart === false) {
+      // opt-out from starting the scheduler
+    } else {
+      // by default, start the scheduler
       this.conn.start();
     }
   }

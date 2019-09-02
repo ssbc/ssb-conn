@@ -49,7 +49,10 @@ export class CONN {
   }
 
   private maybeAutoStartScheduler() {
-    if (this.config.conn && this.config.conn.autostart !== false) {
+    if (this.config.conn && this.config.conn.autostart === false) {
+      // opt-out from starting the scheduler
+    } else {
+      // by default, start the scheduler
       this.startScheduler();
     }
   }
