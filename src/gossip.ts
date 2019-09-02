@@ -90,14 +90,16 @@ export class Gossip {
    */
   private latestWarning: number;
 
-  constructor(ssb: any) {
+  constructor(ssb: any, cfg: any) {
     this.ssb = ssb;
     this.notify = Notify();
     this.conn = this.ssb.conn;
     this.latestWarning = 0;
 
     this.setupConnectionListeners();
-    this.conn.start();
+    if (cfg.conn && cfg.conn.autostart !== false) {
+      this.conn.start();
+    }
   }
 
   private setupConnectionListeners() {
