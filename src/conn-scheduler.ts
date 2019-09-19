@@ -35,17 +35,6 @@ function isOffline(p: Peer) {
 
 const canBeConnected = (p: Peer) => !isOffline(p);
 
-function isLocal(p: Peer): boolean {
-  // don't rely on private ip address, because
-  // cjdns creates fake private ip addresses.
-  // ignore localhost addresses, because sometimes they get broadcast.
-  return (
-    !ip.isLoopback(p[1].host) &&
-    ip.isPrivate(p[1].host) &&
-    (p[1].source === 'local' || p[1].type === 'lan')
-  );
-}
-
 //peers which we can connect to, but are not upgraded.
 //select peers which we can connect to, but are not upgraded to LT.
 //assume any peer is legacy, until we know otherwise...
@@ -55,6 +44,38 @@ function isLegacy(peer: Peer): boolean {
 
 function take(n: number) {
   return <T>(arr: Array<T>) => arr.slice(0, Math.max(n, 0));
+}
+
+type Type =
+  | 'bt'
+  | 'lan'
+  | 'internet'
+  | 'dht'
+  | 'pub'
+  | 'room'
+  | 'room-endpoint'
+  | '?';
+
+function detectType(peer: Peer): Type {
+  const [addr, data] = peer;
+  if (data.type === 'bt') return 'bt';
+  if (data.type === 'lan') return 'lan';
+  if (data.type === 'internet') return 'internet';
+  if (data.type === 'dht') return 'dht';
+  if (data.type === 'pub') return 'pub';
+  if (data.type === 'room') return 'room';
+  if (data.type === 'room-endpoint') return 'room-endpoint';
+  if (data.source === 'local') return 'lan';
+  if (data.source === 'pub') return 'pub';
+  if (data.source === 'internet') return 'internet';
+  if (data.source === 'dht') return 'dht';
+  if (data.inferredType === 'bt') return 'bt';
+  if (data.inferredType === 'lan') return 'lan';
+  if (data.inferredType === 'dht') return 'dht';
+  if (data.inferredType === 'internet') return 'internet';
+  if (addr.startsWith('bt:')) return 'bt';
+  if (addr.startsWith('dht:')) return 'dht';
+  return '?';
 }
 
 const {
@@ -154,6 +175,23 @@ export class ConnScheduler {
     const h = this.hops[data.key];
     return h > 0 && h <= 1;
   };
+
+  private maxWaitToConnect(peer: Peer): number {
+    const type = detectType(peer);
+    switch (type) {
+      case 'lan':
+        return 30e3;
+
+      case 'bt':
+        return 60e3;
+
+      case 'dht':
+        return 300e3;
+
+      default:
+        return 10e3;
+    }
+  }
 
   // Utility to connect to bunch of peers, or disconnect if over quota
   // opts: { quota, backoffStep, backoffMax, groupMin }
@@ -296,20 +334,16 @@ export class ConnScheduler {
     this.ssb.conn
       .query()
       .peersInConnection()
-      .filter(peer => {
-        const permanent = hasPinged(peer) || isLocal(peer);
-        const state = this.ssb.conn.hub().getState(peer[0]);
-        return !permanent || state === 'connecting';
-      })
-      .filter(peer => peer[1].stateChange! + 10e3 < Date.now())
+      .filter(p => this.ssb.conn.hub().getState(p[0]) === 'connecting')
+      .filter(p => p[1].stateChange! + this.maxWaitToConnect(p) < Date.now())
       .forEach(([addr]) => this.ssb.conn.disconnect(addr));
 
-    // Purge an internet connection after it has been up for 1h
+    // Purge an internet connection after it has been up for half an hour
     this.ssb.conn
       .query()
       .peersConnected()
-      .filter(peer => peer[1].type !== 'bt' && peer[1].type !== 'lan')
-      .filter(peer => peer[1].stateChange! + 1 * hour < Date.now())
+      .filter(p => p[1].type !== 'bt' && p[1].type !== 'lan')
+      .filter(p => p[1].stateChange! + 0.5 * hour < Date.now())
       .forEach(([addr]) => this.ssb.conn.disconnect(addr));
   }
 
