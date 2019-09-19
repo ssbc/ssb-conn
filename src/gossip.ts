@@ -18,12 +18,6 @@ function toBase64(s: any): string {
 function toAddressString(address: Peer | string): string {
   if (isPeerObject(address)) {
     if (ref.isAddress(address.address)) return address.address!;
-    if (address.source === 'dht') {
-      return (
-        ['dht', address.host].join(':') + '~' + 'noauth'
-        // ['shs', toBase64(address.key)].join(':')
-      );
-    }
     let protocol = 'net';
     if (address.host && address.host.endsWith('.onion')) protocol = 'onion';
     return (
@@ -35,26 +29,7 @@ function toAddressString(address: Peer | string): string {
   return address;
 }
 
-function isDhtAddress(addr: any) {
-  return typeof addr === 'string' && addr.substr(0, 4) === 'dht:';
-}
-
-function parseDhtAddress(addr: string): Peer {
-  const [transport /*, transform */] = addr.split('~');
-  const [dhtTag, seed, remoteId] = transport.split(':');
-  if (dhtTag !== 'dht') throw new Error('Invalid DHT address ' + addr);
-  return {
-    host: seed + ':' + remoteId,
-    port: 0,
-    key: remoteId[0] === '@' ? remoteId : '@' + remoteId,
-    source: 'dht',
-  };
-}
-
 function parseAddress(address: string) {
-  if (isDhtAddress(address)) {
-    return parseDhtAddress(address);
-  }
   const legacyParsing = ref.parseAddress(address);
   if (legacyParsing) {
     return legacyParsing;
