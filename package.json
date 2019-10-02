@@ -13,7 +13,7 @@
     "debug": "~4.1.1",
     "has-network": "0.0.1",
     "ip": "^1.1.5",
-    "on-change-network": "0.0.2",
+    "on-change-network-strict": "1.0.0",
     "on-wakeup": "^1.0.1",
     "pull-notify": "^0.1.1",
     "pull-pause": "~0.0.2",
