@@ -11,7 +11,7 @@ const Pausable = require('pull-pause');
 const ip = require('ip');
 const onWakeup = require('on-wakeup');
 const onNetwork = require('on-change-network-strict');
-const hasNetwork = require('has-network');
+const hasNetwork = require('has-network2');
 const Ref = require('ssb-ref');
 const debug = require('debug')('ssb:conn:scheduler');
 require('zii');
