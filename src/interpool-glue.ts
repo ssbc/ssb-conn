@@ -14,9 +14,9 @@ export function interpoolGlue(db: ConnDB, hub: ConnHub, staging: ConnStaging) {
     pull(
       pp,
       rpc.gossip.ping({timeout: PING_TIMEOUT}, (err: any) => {
-        if (err && err.name === 'TypeError') {
+        if (err?.name === 'TypeError') {
           db.update(address, (prev: any) => ({
-            ping: {...(prev.ping || {}), fail: true},
+            ping: {...(prev.ping ?? {}), fail: true},
           }));
         }
       }),
@@ -38,7 +38,7 @@ export function interpoolGlue(db: ConnDB, hub: ConnHub, staging: ConnStaging) {
 
   function onConnectingFailed(ev: HubEvent) {
     db.update(ev.address, (prev: any) => ({
-      failure: (prev.failure || 0) + 1,
+      failure: (prev.failure ?? 0) + 1,
       stateChange: Date.now(),
       duration: stats(prev.duration, 0),
     }));

@@ -128,7 +128,7 @@ export class ConnScheduler {
         if (msg.value.author != this.ssb.id) {
           this.lastMessageAt = Date.now();
         }
-        if (msg.value.content && msg.value.content.type === 'contact') {
+        if (msg.value.content?.type === 'contact') {
           this.loadHops(() => this.updateNow());
         }
       });
@@ -136,7 +136,7 @@ export class ConnScheduler {
   }
 
   private loadHops(doneCallback?: () => void) {
-    if (!this.ssb.friends || !this.ssb.friends.hops) {
+    if (!(this.ssb.friends?.hops)) {
       debug('Warning: ssb-friends is missing, scheduling will miss some info');
       return;
     }
@@ -166,12 +166,12 @@ export class ConnScheduler {
   }
 
   private weBlockThem = ([_addr, data]: [string, {key?: string}]) => {
-    if (!data || !data.key) return false;
+    if (!(data?.key)) return false;
     return this.hops[data.key] === -1;
   };
 
   private weFollowThem = ([_addr, data]: [string, {key?: string}]) => {
-    if (!data || !data.key) return false;
+    if (!(data?.key)) return false;
     const h = this.hops[data.key];
     return h > 0 && h <= 1;
   };
@@ -385,8 +385,8 @@ export class ConnScheduler {
       return;
     }
 
-    if (this.config.gossip && this.config.gossip.pub === false) return;
-    if (this.config.gossip && this.config.gossip.autoPopulate === false) return;
+    if (this.config.gossip?.pub === false) return;
+    if (this.config.gossip?.autoPopulate === false) return;
 
     setTimeout(() => {
       type PubContent = {address?: string};
@@ -400,8 +400,7 @@ export class ConnScheduler {
         pull.asyncMap((x: any, cb: any) => setTimeout(() => cb(null, x), 250)),
         pull.filter(
           (msg: Msg<PubContent>['value']) =>
-            msg.content &&
-            msg.content.address &&
+            msg.content?.address &&
             Ref.isAddress(msg.content.address),
         ),
         pausable,
@@ -441,7 +440,7 @@ export class ConnScheduler {
   }
 
   private setupBluetoothDiscovery() {
-    if (!this.ssb.bluetooth || !this.ssb.bluetooth.nearbyScuttlebuttDevices) {
+    if (!(this.ssb.bluetooth?.nearbyScuttlebuttDevices)) {
       debug(
         'Warning: ssb-bluetooth is missing, scheduling will miss some info',
       );
@@ -472,7 +471,7 @@ export class ConnScheduler {
   }
 
   private setupLanDiscovery() {
-    if (!this.ssb.lan || !this.ssb.lan.start || !this.ssb.lan.discoveredPeers) {
+    if (!(this.ssb.lan?.start) || !(this.ssb.lan?.discoveredPeers)) {
       debug('Warning: ssb-lan is missing, scheduling will miss some info');
       return;
     }
@@ -481,7 +480,7 @@ export class ConnScheduler {
       this.ssb.lan.discoveredPeers(),
       pull.drain(({address, verified}: LANDiscovery) => {
         const peer = Ref.parseAddress(address);
-        if (!peer || !peer.key) return;
+        if (!(peer?.key)) return;
         const data: Partial<StagedData> = {
           type: 'lan',
           key: peer.key,
@@ -549,7 +548,7 @@ export class ConnScheduler {
 
   @muxrpc('sync')
   public stop = () => {
-    if (this.ssb.lan && this.ssb.lan.stop) this.ssb.lan.stop();
+    this.ssb.lan?.stop?.();
     this.ssb.conn.hub().reset();
     this.closed = true;
   };

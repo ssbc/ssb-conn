@@ -19,7 +19,7 @@ function toAddressString(address: Peer | string): string {
   if (isPeerObject(address)) {
     if (ref.isAddress(address.address)) return address.address!;
     let protocol = 'net';
-    if (address.host && address.host.endsWith('.onion')) protocol = 'onion';
+    if (address.host?.endsWith('.onion')) protocol = 'onion';
     return (
       [protocol, address.host, address.port].join(':') +
       '~' +
@@ -72,7 +72,7 @@ export class Gossip {
     this.latestWarning = 0;
 
     this.setupConnectionListeners();
-    if (cfg.conn && cfg.conn.autostart === false) {
+    if (cfg.conn?.autostart === false) {
       // opt-out from starting the scheduler
     } else {
       // by default, start the scheduler
@@ -201,8 +201,8 @@ export class Gossip {
     }
 
     this.add(addressString, 'manual');
-    const stagedData = this.conn.staging().get(addressString) || {};
-    const dbData = this.conn.db().get(addressString) || {};
+    const stagedData = this.conn.staging().get(addressString) ?? {};
+    const dbData = this.conn.db().get(addressString) ?? {};
     const data = {...dbData, ...stagedData};
 
     this.conn.connect(addressString, data, cb);
@@ -261,11 +261,11 @@ export class Gossip {
         peer: {
           ...parsed,
           state: this.conn.hub().getState(addressString),
-          source: source || 'manual',
+          source: source ?? 'manual',
         },
-        source: source || 'manual',
+        source: source ?? 'manual',
       });
-      return this.conn.db().get(addressString) || parsed;
+      return this.conn.db().get(addressString) ?? parsed;
     }
   };
 

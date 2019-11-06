@@ -49,7 +49,7 @@ export class CONN {
   }
 
   private maybeAutoStartScheduler() {
-    if (this.config.conn && this.config.conn.autostart === false) {
+    if (this.config.conn?.autostart === false) {
       // opt-out from starting the scheduler
     } else {
       // by default, start the scheduler
@@ -117,14 +117,14 @@ export class CONN {
 
     this._hub
       .connect(address, data)
-      .then(result => cb && cb(null, result), err => cb && cb(err));
+      .then(result => cb?.(null, result), err => cb?.(err));
   };
 
   @muxrpc('async')
   public disconnect = (address: string, cb?: Callback<any>) => {
     this._hub
       .disconnect(address)
-      .then(result => cb && cb(null, result), err => cb && cb(err));
+      .then(result => cb?.(null, result), err => cb?.(err));
   };
 
   @muxrpc('source')
@@ -168,7 +168,7 @@ export class CONN {
     const MIN = 10e3;
     const DEFAULT = 5 * 60e3;
     const MAX = 30 * 60e3;
-    let timeout = (this.config.timers && this.config.timers.ping) || DEFAULT;
+    let timeout = (this.config.timers?.ping) ?? DEFAULT;
     timeout = Math.max(MIN, Math.min(timeout, MAX));
     return ping({timeout});
   };
