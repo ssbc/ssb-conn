@@ -115,16 +115,18 @@ export class CONN {
     const cb = (typeof last === 'function' ? last : null) as Callback<any>;
     const data = (typeof b === 'object' ? b : {}) as any;
 
-    this._hub
-      .connect(address, data)
-      .then(result => cb?.(null, result), err => cb?.(err));
+    this._hub.connect(address, data).then(
+      result => cb?.(null, result),
+      err => cb?.(err),
+    );
   };
 
   @muxrpc('async')
   public disconnect = (address: string, cb?: Callback<any>) => {
-    this._hub
-      .disconnect(address)
-      .then(result => cb?.(null, result), err => cb?.(err));
+    this._hub.disconnect(address).then(
+      result => cb?.(null, result),
+      err => cb?.(err),
+    );
   };
 
   @muxrpc('source')
@@ -168,7 +170,7 @@ export class CONN {
     const MIN = 10e3;
     const DEFAULT = 5 * 60e3;
     const MAX = 30 * 60e3;
-    let timeout = (this.config.timers?.ping) ?? DEFAULT;
+    let timeout = this.config.timers?.ping ?? DEFAULT;
     timeout = Math.max(MIN, Math.min(timeout, MAX));
     return ping({timeout});
   };
