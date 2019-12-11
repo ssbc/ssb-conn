@@ -478,11 +478,11 @@ export class ConnScheduler {
     pull(
       this.ssb.lan.discoveredPeers(),
       pull.drain(({address, verified}: LANDiscovery) => {
-        const peer = Ref.parseAddress(address);
-        if (!peer?.key) return;
+        const key: FeedId | undefined = Ref.getKeyFromAddress(address);
+        if (!key) return;
         const data: Partial<StagedData> = {
           type: 'lan',
-          key: peer.key,
+          key,
           verified,
         };
         if (this.weFollowThem([address, data])) {
