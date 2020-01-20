@@ -175,7 +175,7 @@ The default scheduler is roughly the same as the legacy ssb-gossip plugin, with 
 
 **Periodic connections/disconnections:**
 
-- With (5sec) exponential backoff, try to connect to at most 10 room servers
+- With (5sec) exponential backoff, try to connect to at most 5 room servers
 - With (10sec) exponential backoff, try to connect to at most 2 non-room peers that we have connected successfully before
 - With (30sec) exponential backoff, try to connect to at most 2 non-room peers that we have never with connected before
 - With (1min) exponential backoff, try to connect to at most 3 non-room peers that have we always failed to connect with
