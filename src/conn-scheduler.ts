@@ -42,6 +42,10 @@ function isLegacy(peer: Peer): boolean {
   return hasSuccessfulAttempts(peer) && !hasPinged(peer);
 }
 
+function notRoom(peer: Peer): boolean {
+  return peer[1].type !== 'room';
+}
+
 function take(n: number) {
   return <T>(arr: Array<T>) => arr.slice(0, Math.max(n, 0));
 }
@@ -287,28 +291,28 @@ export class ConnScheduler {
       groupMin: 5e3,
     });
 
-    this.updateTheseConnections(hasPinged, {
+    this.updateTheseConnections(p => notRoom(p) && hasPinged(p), {
       quota: 2,
       backoffStep: 10e3,
       backoffMax: 10 * minute,
       groupMin: 5e3,
     });
 
-    this.updateTheseConnections(hasNoAttempts, {
+    this.updateTheseConnections(p => notRoom(p) && hasNoAttempts(p), {
       quota: 2,
       backoffStep: 30e3,
       backoffMax: 30 * minute,
       groupMin: 15e3,
     });
 
-    this.updateTheseConnections(hasOnlyFailedAttempts, {
+    this.updateTheseConnections(p => notRoom(p) && hasOnlyFailedAttempts(p), {
       quota: 3,
       backoffStep: 1 * minute,
       backoffMax: 3 * hour,
       groupMin: 5 * minute,
     });
 
-    this.updateTheseConnections(isLegacy, {
+    this.updateTheseConnections(p => notRoom(p) && isLegacy(p), {
       quota: 1,
       backoffStep: 4 * minute,
       backoffMax: 3 * hour,

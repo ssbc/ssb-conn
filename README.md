@@ -71,7 +71,7 @@ An "entry" is a (tuple) array of form:
 ```javascript
 [addr, data]
 ```
- where: 
+ where:
  - `addr` is a multiserver address (a **string** that [follows some rules](https://github.com/dominictarr/multiserver-address))
  - `data` is an **object** with additional information about the peer (fields marked 🔷 are important and often used, fields marked 🔹 come from CONN, fields marked 🔸 are ad-hoc and added by various other modules, and fields suffixed with `?` are not always present):
 
@@ -110,7 +110,7 @@ An "entry" is a (tuple) array of form:
 🔸 `room?: string`: (only if `type = 'room-endpoint'`) the public key of the [room](https://github.com/staltz/ssb-room) server where this peer is in
 
 🔸 `onlineCount?: number`: (only if `type = 'room'`) the number of room endpoints currently connected to this room
-   
+
 ## Gossip compatibility
 
 The following gossip plugin APIs are available once you install CONN, but **these will emit deprecation warnings and might behave slightly different than the old gossip plugin**:
@@ -175,10 +175,11 @@ The default scheduler is roughly the same as the legacy ssb-gossip plugin, with 
 
 **Periodic connections/disconnections:**
 
-- With (10sec) exponential backoff, try to connect to peers that we have connected successfully before
-- With (30sec) exponential backoff, try to connect to peers that we have never with connected before
-- With (1min) exponential backoff, try to connect to peers that have we always failed to connect with
-- With (4min) exponential backoff, try to connect to peers that seem to run a legacy version of the gossip plugin
+- With (5sec) exponential backoff, try to connect to at most 10 room servers
+- With (10sec) exponential backoff, try to connect to at most 2 non-room peers that we have connected successfully before
+- With (30sec) exponential backoff, try to connect to at most 2 non-room peers that we have never with connected before
+- With (1min) exponential backoff, try to connect to at most 3 non-room peers that have we always failed to connect with
+- With (4min) exponential backoff, try to connect to at most 1 non-room peer that seem to run a legacy version of the gossip plugin
 
 In none of the cases above shall we connect to a peer that we block.
 
