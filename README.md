@@ -181,14 +181,20 @@ The default scheduler is roughly the same as the legacy ssb-gossip plugin, with 
 - With (1min) exponential backoff, try to connect to at most 3 non-room peers that have we always failed to connect with
 - With (4min) exponential backoff, try to connect to at most 1 non-room peer that seem to run a legacy version of the gossip plugin
 
-In none of the cases above shall we connect to a peer that we block.
+In none of the cases above shall we connect to a peer that we block. In addition to the above, the following actions happen automatically every (approximately) 1 second:
 
-- Automatically connect to (five) staged peers we follow
-- Disconnect from connected peers that have just been blocked
+- Connect to (five) staged peers we follow
+- Disconnect from connected peers that have just been blocked by us
+- Disconnect from peers that have been connected with us for more than 30min
+- Disconnect from peers that have been pending in "connecting" status for too long
+  - "Too long" means 30sec for LAN peers
+  - "Too long" means 1min for Bluetooth peers
+  - "Too long" means 5min for DHT invite peers
+  - For other types of peers, "too long" means 10sec
+- Stage non-blocked peers that are in ConnDB, marked as `autoconnect=false`
+- Unstage peers that have just been blocked by us
 - Unstage LAN peers that haven't been updated in ConnStaging in 10 seconds
 - Unstage Bluetooth peers that haven't been updated in ConnStaging in 30 seconds
-- Wait some 10 seconds before disconnecting a "connecting" peer
-- Disconnect peer that have been online with us for more than 1 hour
 
 **Other events:**
 
