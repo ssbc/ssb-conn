@@ -321,12 +321,12 @@ export class ConnScheduler {
       groupMin: 5 * minute,
     });
 
-    // Automatically connect to (five) staged peers we follow
+    // Automatically connect to some (up to 3) staged peers we follow
     conn
       .query()
       .peersConnectable('staging')
       .filter(this.weFollowThem)
-      .z(take(5))
+      .z(take(3 - conn.query().peersInConnection().length))
       .forEach(([addr, data]) => conn.connect(addr, data));
 
     // Purge connected peers that are now blocked

@@ -183,7 +183,7 @@ The default scheduler is roughly the same as the legacy ssb-gossip plugin, with 
 
 In none of the cases above shall we connect to a peer that we block. In addition to the above, the following actions happen automatically every (approximately) 1 second:
 
-- Connect to (five) staged peers we follow
+- Connect to (at most 3) staged peers we follow
 - Disconnect from connected peers that have just been blocked by us
 - Disconnect from peers that have been connected with us for more than 30min
 - Disconnect from peers that have been pending in "connecting" status for too long
