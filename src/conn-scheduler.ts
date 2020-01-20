@@ -264,6 +264,8 @@ export class ConnScheduler {
   }
 
   private updateHubNow() {
+    const conn = this.ssb.conn;
+
     if (this.conf('seed', true)) {
       this.updateTheseConnections(p => p[1].source === 'seed', {
         quota: 3,
@@ -274,7 +276,7 @@ export class ConnScheduler {
     }
 
     // If there are no peers, then try *any* connection ASAP
-    if (this.ssb.conn.query().peersInConnection().length === 0) {
+    if (conn.query().peersInConnection().length === 0) {
       this.updateTheseConnections(() => true, {
         quota: 1,
         backoffStep: 1e3,
@@ -320,35 +322,35 @@ export class ConnScheduler {
     });
 
     // Automatically connect to (five) staged peers we follow
-    this.ssb.conn
+    conn
       .query()
       .peersConnectable('staging')
       .filter(this.weFollowThem)
       .z(take(5))
-      .forEach(([addr, data]) => this.ssb.conn.connect(addr, data));
+      .forEach(([addr, data]) => conn.connect(addr, data));
 
     // Purge connected peers that are now blocked
-    this.ssb.conn
+    conn
       .query()
       .peersInConnection()
       .filter(this.weBlockThem)
-      .forEach(([addr]) => this.ssb.conn.disconnect(addr));
+      .forEach(([addr]) => conn.disconnect(addr));
 
     // Purge some ongoing frustrating connection attempts
-    this.ssb.conn
+    conn
       .query()
       .peersInConnection()
-      .filter(p => this.ssb.conn.hub().getState(p[0]) === 'connecting')
+      .filter(p => conn.hub().getState(p[0]) === 'connecting')
       .filter(p => p[1].stateChange! + this.maxWaitToConnect(p) < Date.now())
-      .forEach(([addr]) => this.ssb.conn.disconnect(addr));
+      .forEach(([addr]) => conn.disconnect(addr));
 
     // Purge an internet connection after it has been up for half an hour
-    this.ssb.conn
+    conn
       .query()
       .peersConnected()
       .filter(p => p[1].type !== 'bt' && p[1].type !== 'lan')
       .filter(p => p[1].stateChange! + 0.5 * hour < Date.now())
-      .forEach(([addr]) => this.ssb.conn.disconnect(addr));
+      .forEach(([addr]) => conn.disconnect(addr));
   }
 
   private updateNow() {
