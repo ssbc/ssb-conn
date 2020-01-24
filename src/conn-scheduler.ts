@@ -503,12 +503,13 @@ export class ConnScheduler {
     this.closed = false;
 
     // Upon init, purge some undesired DB entries
-    for (let [address, {source, type}] of this.ssb.conn.dbPeers()) {
+    for (let [address, {source, type, failure}] of this.ssb.conn.dbPeers()) {
       if (
         source === 'local' ||
         source === 'bt' ||
         type === 'lan' ||
-        type === 'bt'
+        type === 'bt' ||
+        (failure ?? 0) > 200
       ) {
         this.ssb.conn.forget(address);
       }

@@ -201,6 +201,7 @@ In none of the cases above shall we connect to a peer that we block. In addition
 Upon starting the scheduler:
 
 - Remove database entries for any LAN or Bluetooth peers (these are rediscovered just-in-time)
+- Remove database entries of peers that, after 200 attempts, we still fail to connect with
 
 **Other events:**
 
