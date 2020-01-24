@@ -196,6 +196,12 @@ In none of the cases above shall we connect to a peer that we block. In addition
 - Unstage LAN peers that haven't been updated in ConnStaging in 10 seconds
 - Unstage Bluetooth peers that haven't been updated in ConnStaging in 30 seconds
 
+**Database cleanups:**
+
+Upon starting the scheduler:
+
+- Remove database entries for any LAN or Bluetooth peers (these are rediscovered just-in-time)
+
 **Other events:**
 
 - Upon wakeup (from computer 'sleep'), fully reset the ConnHub
