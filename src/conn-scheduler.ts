@@ -1,4 +1,5 @@
 import ConnQuery = require('ssb-conn-query');
+import {AddressData as DBData} from 'ssb-conn-db/lib/types';
 import {ListenEvent as HubEvent} from 'ssb-conn-hub/lib/types';
 import {StagedData} from 'ssb-conn-staging/lib/types';
 import {Peer} from 'ssb-conn-query/lib/types';
@@ -44,6 +45,14 @@ function isLegacy(peer: Peer): boolean {
 
 function notRoom(peer: Peer): boolean {
   return peer[1].type !== 'room';
+}
+
+function isDefunct(peer: Peer): boolean {
+  return peer[1].defunct !== true;
+}
+
+function notDefunct(peer: Peer): boolean {
+  return peer[1].defunct !== true;
 }
 
 function take(n: number) {
@@ -210,6 +219,7 @@ export class ConnScheduler {
 
     // Connect to suitable candidates
     peersDown
+      .filter(notDefunct)
       .filter(p => !this.weBlockThem(p))
       .filter(canBeConnected)
       .filter(([, data]) => data.autoconnect !== false)
@@ -230,14 +240,16 @@ export class ConnScheduler {
     this.ssb.conn
       .query()
       .peersConnectable('db')
+      .filter(notDefunct)
       .filter(p => !this.weBlockThem(p))
       .filter(([, data]) => data.autoconnect === false)
       .forEach(([addr, data]) => this.ssb.conn.stage(addr, data));
 
-    // Purge staged peers that are now blocked
+    // Purge staged peers that are now blocked or defunct
     this.ssb.conn
       .query()
       .peersConnectable('staging')
+      .filter(isDefunct)
       .filter(this.weBlockThem)
       .forEach(([addr]) => this.ssb.conn.unstage(addr));
 
@@ -369,6 +381,10 @@ export class ConnScheduler {
       this.hasScheduledAnUpdate = false;
     }, fuzzyPeriod);
     if (timer.unref) timer.unref();
+  }
+
+  private markDefunct([addr, data]: [string, DBData]) {
+    this.ssb.conn.db().replace(addr, {defunct: true, birth: data.birth});
   }
 
   private populateWithSeeds() {
@@ -503,15 +519,18 @@ export class ConnScheduler {
     this.closed = false;
 
     // Upon init, purge some undesired DB entries
-    for (let [address, {source, type, failure}] of this.ssb.conn.dbPeers()) {
+    for (let peer of this.ssb.conn.dbPeers()) {
+      const [address, {source, type, failure}] = peer;
       if (
         source === 'local' ||
         source === 'bt' ||
         type === 'lan' ||
-        type === 'bt' ||
-        (failure ?? 0) > 200
+        type === 'bt'
       ) {
         this.ssb.conn.forget(address);
+      }
+      if (failure ?? 0 > 200) {
+        this.markDefunct(peer);
       }
     }
 
