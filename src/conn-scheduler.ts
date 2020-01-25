@@ -384,7 +384,9 @@ export class ConnScheduler {
   }
 
   private markDefunct([addr, data]: [string, DBData]) {
-    this.ssb.conn.db().replace(addr, {defunct: true, birth: data.birth});
+    this.ssb.conn
+      .db()
+      .replace(addr, {defunct: true, birth: data.birth, autoconnect: false});
   }
 
   private populateWithSeeds() {
