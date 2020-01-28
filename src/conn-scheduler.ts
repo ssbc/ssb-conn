@@ -110,11 +110,15 @@ const hour = 60 * 60e3;
 
 type BTPeer = {remoteAddress: string; id: string; displayName: string};
 
+type Pausable = {pause: CallableFunction; resume: CallableFunction};
+
 @plugin('1.0.0')
 export class ConnScheduler {
   private readonly ssb: {conn: CONN; [name: string]: any};
-  private readonly config: any;
+  private readonly config: Record<string, any>;
   private readonly hasSsbDb: boolean;
+  private pubDiscoveryPausable?: Pausable;
+  private intervalForUpdate?: NodeJS.Timeout;
   private closed: boolean;
   private isLoadingHops: boolean;
   private lastMessageAt: number;
@@ -361,6 +365,7 @@ export class ConnScheduler {
   }
 
   private updateNow() {
+    if (this.closed) return;
     if (this.hasSsbDb && !this.ssb.ready()) return;
     if (this.isCurrentlyDownloading()) return;
     if (this.isLoadingHops) return;
@@ -410,7 +415,7 @@ export class ConnScheduler {
     setTimeout(() => {
       type PubContent = {address?: string};
       const MAX_STAGED_PUBS = 3;
-      const pausable = Pausable();
+      this.pubDiscoveryPausable = this.pubDiscoveryPausable ?? Pausable();
 
       pull(
         this.ssb.messagesByType({type: 'pub', live: true, keys: false}),
@@ -421,7 +426,7 @@ export class ConnScheduler {
           (msg: Msg<PubContent>['value']) =>
             msg.content?.address && Ref.isAddress(msg.content.address),
         ),
-        pausable,
+        this.pubDiscoveryPausable,
         pull.drain((msg: Msg<PubContent>['value']) => {
           try {
             const address = Ref.toMultiServerAddress(msg.content.address!);
@@ -446,11 +451,13 @@ export class ConnScheduler {
       pull(
         this.ssb.conn.staging().liveEntries(),
         pull.drain((staged: Array<any>) => {
+          if (this.closed) return;
+
           const stagedPubs = staged.filter(([, data]) => data.type === 'pub');
           if (stagedPubs.length >= MAX_STAGED_PUBS) {
-            pausable.pause();
+            this.pubDiscoveryPausable?.pause();
           } else {
-            pausable.resume();
+            this.pubDiscoveryPausable?.resume();
           }
         }),
       );
@@ -468,6 +475,8 @@ export class ConnScheduler {
     pull(
       this.ssb.bluetooth.nearbyScuttlebuttDevices(1000),
       pull.drain(({discovered}: {discovered: Array<BTPeer>}) => {
+        if (this.closed) return;
+
         for (const btPeer of discovered) {
           const address =
             `bt:${btPeer.remoteAddress.split(':').join('')}` +
@@ -544,18 +553,25 @@ export class ConnScheduler {
 
     // Upon init, setup discovery via various modes
     this.setupPubDiscovery();
+    this.pubDiscoveryPausable?.resume();
     this.setupLanDiscovery();
     this.setupBluetoothDiscovery();
 
     // Upon regular time intervals, attempt to make connections
-    const int = setInterval(() => this.updateSoon(), 2e3);
-    if (int.unref) int.unref();
+    this.intervalForUpdate = setInterval(() => this.updateSoon(), 2e3);
+    if (this.intervalForUpdate?.unref) this.intervalForUpdate.unref();
 
     // Upon wakeup, trigger hard reconnect
-    onWakeup(() => this.ssb.conn.hub().reset());
+    onWakeup(() => {
+      if (this.closed) return;
+      this.ssb.conn.hub().reset();
+    });
 
     // Upon network changes, trigger hard reconnect
-    onNetwork(() => this.ssb.conn.hub().reset());
+    onNetwork(() => {
+      if (this.closed) return;
+      this.ssb.conn.hub().reset();
+    });
 
     // Upon some disconnection, attempt to make connections
     pull(
@@ -570,7 +586,12 @@ export class ConnScheduler {
 
   @muxrpc('sync')
   public stop = () => {
+    this.pubDiscoveryPausable?.pause();
     this.ssb.lan?.stop?.();
+    if (this.intervalForUpdate) {
+      clearInterval(this.intervalForUpdate);
+      this.intervalForUpdate = void 0;
+    }
     this.ssb.conn.hub().reset();
     this.closed = true;
   };
