@@ -48,7 +48,7 @@ function notRoom(peer: Peer): boolean {
 }
 
 function isDefunct(peer: Peer | [string, DBData]): boolean {
-  return peer[1].defunct !== true;
+  return peer[1].defunct === true;
 }
 
 function take(n: number) {
@@ -382,7 +382,7 @@ export class ConnScheduler {
   }
 
   private removeDefunct(addr: string) {
-    this.ssb.conn.db().update(addr, {defunct: void 0, autoconnect: false});
+    this.ssb.conn.db().update(addr, {defunct: void 0, autoconnect: void 0});
   }
 
   private populateWithSeeds() {
