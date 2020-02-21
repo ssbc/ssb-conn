@@ -47,11 +47,7 @@ function notRoom(peer: Peer): boolean {
   return peer[1].type !== 'room';
 }
 
-function isDefunct(peer: Peer): boolean {
-  return peer[1].defunct !== true;
-}
-
-function notDefunct(peer: Peer): boolean {
+function isDefunct(peer: Peer | [string, DBData]): boolean {
   return peer[1].defunct !== true;
 }
 
@@ -223,7 +219,6 @@ export class ConnScheduler {
 
     // Connect to suitable candidates
     peersDown
-      .filter(notDefunct)
       .filter(p => !this.weBlockThem(p))
       .filter(canBeConnected)
       .filter(([, data]) => data.autoconnect !== false)
@@ -244,16 +239,14 @@ export class ConnScheduler {
     this.ssb.conn
       .query()
       .peersConnectable('db')
-      .filter(notDefunct)
       .filter(p => !this.weBlockThem(p))
       .filter(([, data]) => data.autoconnect === false)
       .forEach(([addr, data]) => this.ssb.conn.stage(addr, data));
 
-    // Purge staged peers that are now blocked or defunct
+    // Purge staged peers that are now blocked
     this.ssb.conn
       .query()
       .peersConnectable('staging')
-      .filter(isDefunct)
       .filter(this.weBlockThem)
       .forEach(([addr]) => this.ssb.conn.unstage(addr));
 
@@ -388,10 +381,8 @@ export class ConnScheduler {
     if (timer.unref) timer.unref();
   }
 
-  private markDefunct([addr, data]: [string, DBData]) {
-    this.ssb.conn
-      .db()
-      .replace(addr, {defunct: true, birth: data.birth, autoconnect: false});
+  private removeDefunct(addr: string) {
+    this.ssb.conn.db().update(addr, {defunct: void 0, autoconnect: false});
   }
 
   private populateWithSeeds() {
@@ -531,7 +522,7 @@ export class ConnScheduler {
 
     // Upon init, purge some undesired DB entries
     for (let peer of this.ssb.conn.dbPeers()) {
-      const [address, {source, type, failure}] = peer;
+      const [address, {source, type}] = peer;
       if (
         source === 'local' ||
         source === 'bt' ||
@@ -540,8 +531,8 @@ export class ConnScheduler {
       ) {
         this.ssb.conn.forget(address);
       }
-      if (failure ?? 0 > 200) {
-        this.markDefunct(peer);
+      if (isDefunct(peer)) {
+        this.removeDefunct(address);
       }
     }
 

@@ -105,8 +105,6 @@ An "entry" is a (tuple) array of form:
 
 🔹 `pool?: 'db' | 'hub' | 'staging'`: this only appears in ConnQuery APIs, and indicates from which pool (ConnDB or ConnHub or ConnStaging) was this peer picked
 
-🔸 `defunct?: boolean`: a flag that (when `true`) indicates that this peer was deemed "no longer operative" by the default CONN scheduler, after hundreds of failed attempts were made to connect with it
-
 🔸 `name?: string`: a nickname for this peer, when there isn't an [ssb-about](https://github.com/ssbc/ssb-about) name
 
 🔸 `room?: string`: (only if `type = 'room-endpoint'`) the public key of the [room](https://github.com/staltz/ssb-room) server where this peer is in
@@ -183,7 +181,7 @@ The default scheduler is roughly the same as the legacy ssb-gossip plugin, with 
 - With (1min) exponential backoff, try to connect to at most 3 non-room peers that have we always failed to connect with
 - With (4min) exponential backoff, try to connect to at most 1 non-room peer that seem to run a legacy version of the gossip plugin
 
-In none of the cases above shall we connect to a peer that we block, not those that are marked "defunct". In addition to the above, the following actions happen automatically every (approximately) 1 second:
+In none of the cases above shall we connect to a peer that we block. In addition to the above, the following actions happen automatically every (approximately) 1 second:
 
 - Connect to (at most 3) staged peers we follow
 - Disconnect from connected peers that have just been blocked by us
@@ -193,7 +191,7 @@ In none of the cases above shall we connect to a peer that we block, not those t
   - "Too long" means 1min for Bluetooth peers
   - "Too long" means 5min for DHT invite peers
   - For other types of peers, "too long" means 10sec
-- Stage non-blocked non-defunct peers that are in ConnDB marked as `autoconnect=false`
+- Stage non-blocked peers that are in ConnDB marked as `autoconnect=false`
 - Unstage peers that have just been blocked by us
 - Unstage LAN peers that haven't been updated in ConnStaging in 10 seconds
 - Unstage Bluetooth peers that haven't been updated in ConnStaging in 30 seconds
@@ -203,7 +201,6 @@ In none of the cases above shall we connect to a peer that we block, not those t
 Upon starting the scheduler:
 
 - Remove database entries for any LAN or Bluetooth peers (these are rediscovered just-in-time)
-- Mark database entries "defunct" if, after 200 attempts, we still fail to connect with them
 
 **Other events:**
 
