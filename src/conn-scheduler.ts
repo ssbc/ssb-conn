@@ -178,10 +178,13 @@ export class ConnScheduler {
     return this.hops[data.key] === -1;
   };
 
-  private weFollowThem = ([_addr, data]: [string, {key?: string}]) => {
+  private weConnectToThem = ([_addr, data]: [string, {key?: string}]) => {
     if (!data?.key) return false;
     const h = this.hops[data.key];
-    return h > 0 && h <= 1;
+
+    // Only connect to feeds we follow unless `config.conn.hops` is set.
+    const maxHops = this.config.conn.hops ?? 1
+    return h > 0 && h <= maxHops;
   };
 
   private maxWaitToConnect(peer: Peer): number {
@@ -329,7 +332,7 @@ export class ConnScheduler {
     conn
       .query()
       .peersConnectable('staging')
-      .filter(this.weFollowThem)
+      .filter(this.weConnectToThem)
       .z(take(3 - conn.query().peersInConnection().length))
       .forEach(([addr, data]) => conn.connect(addr, data));
 
@@ -478,7 +481,7 @@ export class ConnScheduler {
             note: btPeer.displayName,
             key: btPeer.id,
           };
-          if (this.weFollowThem([address, data])) {
+          if (this.weConnectToThem([address, data])) {
             this.ssb.conn.connect(address, data);
           } else {
             this.ssb.conn.stage(address, data);
@@ -504,7 +507,7 @@ export class ConnScheduler {
           key,
           verified,
         };
-        if (this.weFollowThem([address, data])) {
+        if (this.weConnectToThem([address, data])) {
           this.ssb.conn.connect(address, data);
         } else {
           this.ssb.conn.stage(address, data);
