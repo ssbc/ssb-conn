@@ -7,6 +7,7 @@ import {Discovery as LANDiscovery} from 'ssb-lan/lib/types';
 import {Msg, FeedId} from 'ssb-typescript';
 import {plugin, muxrpc} from 'secret-stack-decorators';
 import {CONN} from './conn';
+import {Config} from './types';
 const pull = require('pull-stream');
 const Pausable = require('pull-pause');
 const ip = require('ip');
@@ -111,7 +112,7 @@ type Pausable = {pause: CallableFunction; resume: CallableFunction};
 @plugin('1.0.0')
 export class ConnScheduler {
   private readonly ssb: {conn: CONN; [name: string]: any};
-  private readonly config: Record<string, any>;
+  private readonly config: Config;
   private readonly hasSsbDb: boolean;
   private pubDiscoveryPausable?: Pausable;
   private intervalForUpdate?: NodeJS.Timeout;
@@ -161,13 +162,6 @@ export class ConnScheduler {
     });
   }
 
-  // Utility to pick from config, with some defaults
-  private conf(name: any, def: any) {
-    if (this.config.gossip == null) return def;
-    const value = this.config.gossip[name];
-    return value == null || value === '' ? def : value;
-  }
-
   private isCurrentlyDownloading() {
     // don't schedule new connections if currently downloading messages
     return this.lastMessageAt && this.lastMessageAt > Date.now() - 500;
@@ -178,12 +172,12 @@ export class ConnScheduler {
     return this.hops[data.key] === -1;
   };
 
-  private weConnectToThem = ([_addr, data]: [string, {key?: string}]) => {
+  private weShouldConnectToThem = ([_addr, data]: [string, {key?: string}]) => {
     if (!data?.key) return false;
     const h = this.hops[data.key];
 
     // Only connect to feeds we follow unless `config.conn.hops` is set.
-    const maxHops = this.config.conn.hops ?? 1
+    const maxHops = this.config.conn?.hops ?? 1;
     return h > 0 && h <= maxHops;
   };
 
@@ -273,7 +267,7 @@ export class ConnScheduler {
   private updateHubNow() {
     const conn = this.ssb.conn;
 
-    if (this.conf('seed', true)) {
+    if (this.config.seed ?? true) {
       this.updateTheseConnections(p => p[1].source === 'seed', {
         quota: 3,
         backoffStep: 2e3,
@@ -332,7 +326,7 @@ export class ConnScheduler {
     conn
       .query()
       .peersConnectable('staging')
-      .filter(this.weConnectToThem)
+      .filter(this.weShouldConnectToThem)
       .z(take(3 - conn.query().peersInConnection().length))
       .forEach(([addr, data]) => conn.connect(addr, data));
 
@@ -389,8 +383,8 @@ export class ConnScheduler {
   }
 
   private populateWithSeeds() {
-    // Populate gossip table with configured seeds (mainly used in testing)
-    const seeds = this.config.seeds;
+    // Populate connDB with configured seeds (mainly used in testing)
+    const seeds = this.config.seeds ?? [];
     (Array.isArray(seeds) ? seeds : [seeds]).filter(Boolean).forEach(addr => {
       const key = Ref.getKeyFromAddress(addr);
       this.ssb.conn.remember(addr, {key, source: 'seed'});
@@ -403,8 +397,7 @@ export class ConnScheduler {
       return;
     }
 
-    if (this.config.gossip?.pub === false) return;
-    if (this.config.gossip?.autoPopulate === false) return;
+    if (this.config.conn?.populatePubs === false) return;
 
     setTimeout(() => {
       type PubContent = {address?: string};
@@ -481,7 +474,7 @@ export class ConnScheduler {
             note: btPeer.displayName,
             key: btPeer.id,
           };
-          if (this.weConnectToThem([address, data])) {
+          if (this.weShouldConnectToThem([address, data])) {
             this.ssb.conn.connect(address, data);
           } else {
             this.ssb.conn.stage(address, data);
@@ -507,7 +500,7 @@ export class ConnScheduler {
           key,
           verified,
         };
-        if (this.weConnectToThem([address, data])) {
+        if (this.weShouldConnectToThem([address, data])) {
           this.ssb.conn.connect(address, data);
         } else {
           this.ssb.conn.stage(address, data);
