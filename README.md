@@ -111,6 +111,34 @@ An "entry" is a (tuple) array of form:
 
 🔸 `onlineCount?: number`: (only if `type = 'room'`) the number of room endpoints currently connected to this room
 
+## Config
+
+Some parameters in CONN can be configured by the user or by application code through the conventional [ssb-config](https://github.com/ssbc/ssb-config). The possible options are listed below:
+
+```typescript
+{
+  "conn": {
+    /**
+     * Whether the CONN scheduler should start automatically as soon as the
+     * SSB app is initialized. Default is `true`.
+     */
+    "autostart": boolean,
+
+    /**
+     * How far in the social graph should a peer be automatically connected to
+     * whenever possible. Default value (when this is unspecified) is `1`.
+     */
+    "hops": number,
+
+    /**
+     * Whether the CONN scheduler should look into the SSB database looking for
+     * messages of type 'pub' and add them to CONN.
+     */
+    "populatePubs": boolean,
+  }
+}
+```
+
 ## Gossip compatibility
 
 The following gossip plugin APIs are available once you install CONN, but **these will emit deprecation warnings and might behave slightly different than the old gossip plugin**:
