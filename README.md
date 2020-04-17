@@ -132,7 +132,7 @@ Some parameters in CONN can be configured by the user or by application code thr
 
     /**
      * Whether the CONN scheduler should look into the SSB database looking for
-     * messages of type 'pub' and add them to CONN.
+     * messages of type 'pub' and add them to CONN. Default is `true`.
      */
     "populatePubs": boolean,
   }
