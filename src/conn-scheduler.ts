@@ -400,6 +400,7 @@ export class ConnScheduler {
     if (this.config.conn?.populatePubs === false) return;
 
     setTimeout(() => {
+      if (this.closed) return;
       type PubContent = {address?: string};
       const MAX_STAGED_PUBS = 3;
       this.pubDiscoveryPausable = this.pubDiscoveryPausable ?? Pausable();
