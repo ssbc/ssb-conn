@@ -59,6 +59,7 @@ export class Gossip {
   private readonly ssb: any;
   private readonly notify: any;
   private readonly conn: CONN;
+  private deprecationWarned: any;
 
   /**
    * Timestamp of the latest deprecation warning for gossip.peers()
@@ -78,6 +79,8 @@ export class Gossip {
       // by default, start the scheduler
       this.conn.start();
     }
+
+    this.deprecationWarned = {};
   }
 
   private setupConnectionListeners() {
@@ -130,6 +133,13 @@ export class Gossip {
     return addr;
   }
 
+  private deprecationWarning(method: any) {
+    if (this.deprecationWarned[method]) return
+
+    console.error(`DEPRECATED gossip.${method}() was called. Use ssb-conn instead`);
+    this.deprecationWarned[method] = true
+  }
+
   @muxrpc('sync')
   public peers: () => any = () => {
     if (this.latestWarning + 10e3 < Date.now()) {
@@ -166,7 +176,7 @@ export class Gossip {
   // but it's still used in tests and it's in the manifest
   @muxrpc('sync')
   public get: (addr: Peer | string) => any = (addr: Peer | string) => {
-    console.error('DEPRECATED gossip.get() was called. Use ssb-conn instead');
+    this.deprecationWarning('get');
     if (ref.isFeed(addr)) {
       for (let [address, data] of this.conn.db().entries()) {
         if (data.key === addr) {
@@ -189,9 +199,7 @@ export class Gossip {
 
   @muxrpc('async')
   public connect = (addr: Peer | string, cb: Callback<any>) => {
-    console.error(
-      'DEPRECATED gossip.connect() was called. Use ssb-conn instead',
-    );
+    this.deprecationWarning('connect');
     let addressString: string;
     try {
       const inputAddr = ref.isFeed(addr) ? this.idToAddr(addr) : addr;
@@ -210,9 +218,7 @@ export class Gossip {
 
   @muxrpc('async')
   public disconnect = (addr: Peer | string, cb: any) => {
-    console.error(
-      'DEPRECATED gossip.disconnect() was called. Use ssb-conn instead',
-    );
+    this.deprecationWarning('disconnect');
     let addressString: string;
     try {
       const inputAddr = ref.isFeed(addr) ? this.idToAddr(addr) : addr;
@@ -226,15 +232,13 @@ export class Gossip {
 
   @muxrpc('source')
   public changes = () => {
-    console.error(
-      'DEPRECATED gossip.changes() was called. Use ssb-conn instead',
-    );
+    this.deprecationWarning('changes');
     return this.notify.listen();
   };
 
   @muxrpc('sync')
   public add = (addr: Peer | string, source: Peer['source']) => {
-    console.error('DEPRECATED gossip.add() was called. Use ssb-conn instead');
+    this.deprecationWarning('add');
     const [addressString, parsed] = validateAddr(addr);
     if (parsed.key === this.ssb.id) return;
 
@@ -271,9 +275,7 @@ export class Gossip {
 
   @muxrpc('sync')
   public remove = (addr: Peer | string) => {
-    console.error(
-      'DEPRECATED gossip.remove() was called. Use ssb-conn instead',
-    );
+    this.deprecationWarning('remove');
     const [addressString] = validateAddr(addr);
 
     this.conn.hub().disconnect(addressString);
@@ -290,9 +292,7 @@ export class Gossip {
 
   @muxrpc('sync')
   public reconnect = () => {
-    console.error(
-      'DEPRECATED gossip.reconnect() was called. Use ssb-conn instead',
-    );
+    this.deprecationWarning('reconnect');
     this.conn.hub().reset();
   };
 
