@@ -59,7 +59,7 @@ export class Gossip {
   private readonly ssb: any;
   private readonly notify: any;
   private readonly conn: CONN;
-  private deprecationWarned: any;
+  private deprecationWarned: Partial<Record<keyof Gossip, boolean>>;
 
   /**
    * Timestamp of the latest deprecation warning for gossip.peers()
@@ -133,11 +133,13 @@ export class Gossip {
     return addr;
   }
 
-  private deprecationWarning(method: any) {
-    if (this.deprecationWarned[method]) return
+  private deprecationWarning(method: keyof Gossip) {
+    if (this.deprecationWarned[method]) return;
 
-    console.error(`DEPRECATED gossip.${method}() was called. Use ssb-conn instead`);
-    this.deprecationWarned[method] = true
+    console.error(
+      `DEPRECATED gossip.${method}() was called. Use ssb-conn instead`,
+    );
+    this.deprecationWarned[method] = true;
   }
 
   @muxrpc('sync')
