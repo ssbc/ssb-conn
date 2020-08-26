@@ -172,7 +172,7 @@ export class ConnScheduler {
     return this.hops[data.key] === -1;
   };
 
-  private weShouldConnectToThem = ([_addr, data]: [string, {key?: string}]) => {
+  private weFollowThem = ([_addr, data]: [string, {key?: string}]) => {
     if (!data?.key) return false;
     const h = this.hops[data.key];
 
@@ -326,8 +326,12 @@ export class ConnScheduler {
     conn
       .query()
       .peersConnectable('staging')
-      .filter(this.weShouldConnectToThem)
-      .z(take(3 - conn.query().peersInConnection().length))
+      .filter(this.weFollowThem)
+      .z(
+        take(
+          3 - conn.query().peersInConnection().filter(this.weFollowThem).length,
+        ),
+      )
       .forEach(([addr, data]) => conn.connect(addr, data));
 
     // Purge connected peers that are now blocked
@@ -474,7 +478,7 @@ export class ConnScheduler {
             note: btPeer.displayName,
             key: btPeer.id,
           };
-          if (this.weShouldConnectToThem([address, data])) {
+          if (this.weFollowThem([address, data])) {
             this.ssb.conn.connect(address, data);
           } else {
             this.ssb.conn.stage(address, data);
@@ -500,7 +504,7 @@ export class ConnScheduler {
           key,
           verified,
         };
-        if (this.weShouldConnectToThem([address, data])) {
+        if (this.weFollowThem([address, data])) {
           this.ssb.conn.connect(address, data);
         } else {
           this.ssb.conn.stage(address, data);
