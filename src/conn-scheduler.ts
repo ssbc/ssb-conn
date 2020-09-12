@@ -396,12 +396,12 @@ export class ConnScheduler {
   }
 
   private setupPubDiscovery() {
+    if (this.config.conn?.populatePubs === false) return;
+
     if (!this.hasSsbDb) {
       debug('Warning: ssb-db is missing, scheduling will miss some info');
       return;
     }
-
-    if (this.config.conn?.populatePubs === false) return;
 
     setTimeout(() => {
       if (this.closed) return;
