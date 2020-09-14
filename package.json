@@ -22,7 +22,7 @@
     "secret-stack-decorators": "1.0.0",
     "ssb-conn-db": "~0.3.3",
     "ssb-conn-hub": "~0.2.7",
-    "ssb-conn-query": "~0.4.5",
+    "ssb-conn-query": "~0.4.6",
     "ssb-conn-staging": "~0.1.0",
     "ssb-ref": "^2.13.9",
     "ssb-typescript": "^1.5.0",
