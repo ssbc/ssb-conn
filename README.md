@@ -73,7 +73,12 @@ An "entry" is a (tuple) array of form:
 ```
  where:
  - `addr` is a multiserver address (a **string** that [follows some rules](https://github.com/dominictarr/multiserver-address))
- - `data` is an **object** with additional information about the peer (fields marked 🔷 are important and often used, fields marked 🔹 come from CONN, fields marked 🔸 are ad-hoc and added by various other modules, and fields suffixed with `?` are not always present):
+ - `data` is an **object** with additional information about the peer 
+ 
+<details>
+  <summary>Full details on fields present in <code>data</code> (click here)</summary>
+
+Fields marked 🔷 are important and often used, fields marked 🔹 come from CONN, fields marked 🔸 are ad-hoc and added by various other modules, and fields suffixed with `?` are not always present:
 
 🔷 `key: string`: the peer's public key / feedId
 
@@ -110,6 +115,57 @@ An "entry" is a (tuple) array of form:
 🔸 `room?: string`: (only if `type = 'room-endpoint'`) the public key of the [room](https://github.com/staltz/ssb-room) server where this peer is in
 
 🔸 `onlineCount?: number`: (only if `type = 'room'`) the number of room endpoints currently connected to this room
+
+</details>
+
+## Recipes
+
+**How can I get a pull stream of all currently connected peers?**
+
+You can use `ssb.conn.peers()` to get a stream of "all peers currently being processed" and then use Array `filter` to pick only peers that are strictly *connected*, ignoring those that are *connecting* or *disconnecting*:
+
+```js
+var connectedPeersStream = pull(
+  ssb.conn.peers(),
+  pull.map(entries => 
+    entries.filter(([addr, data]) => data.state === 'connected')
+  )
+)
+```
+
+Then you can drain the stream to get an array of connected peers:
+
+```js
+pull(
+  connectedPeersStream,
+  pull.drain(connectedPeers => {
+    console.log(connectedPeers) 
+    // [
+    //   ['net:192.168.1...', {key: '@Ql...', ...}], 
+    //   ['net:192.168.2...', {key: '@ye...', ...}]
+    // ]
+  })
+)
+```
+
+**How can I _immediately_ get all currently connected peers?**
+
+If you're not interested in updates, but just want to make a single request/response for the currently connected peers, you use `ssb.conn.peers()` plus some pull-stream operators:
+
+```js
+function getConnectedPeersNow(cb) {
+  pull(
+    ssb.conn.peers(),
+    pull.map(entries => 
+      entries.filter(([addr, data]) => data.state === 'connected')
+    )
+    pull.take(1), // This is important
+    pull.drain(connectedPeers => cb(null, connectedPeers))
+  )
+}
+
+getConnectedPeersNow(arr => console.log(arr))
+```
 
 ## Config
 
