@@ -43,28 +43,23 @@ Add this plugin to ssb-server like this:
 
 Now you should be able to access the muxrpc APIs under `ssb.conn` and `ssb.gossip`, see next section.
 
-## API
+## Basic API
 
 Under `ssb.conn.*` you can call any of these APIs in your local peer.
 
 | API | Type | Description |
 |-----|------|-------------|
-| **`remember(addr, data?)`** | `sync` | Stores (in cold storage) connection information about a new peer, known by its multiserver address `addr` and additional optional `data` (as an object). |
-| **`forget(addr)`** | `sync` | Removes (from cold storage) connection information about a peer known by its multiserver address `addr`. |
-| **`dbPeers()`** | `sync` | Returns an Iterable of ConnDB entries known at the moment. Does not reactively update once the database is written to. |
 | **`connect(addr, data?)`** | `async` | Connects to a peer known by its multiserver address `addr`, and stores additional optional `data` (as an object) during its connection lifespan. |
 | **`disconnect(addr)`** | `async` | Disconnects a peer known by its multiserver address `addr`. |
 | **`peers()`** | `source` | A pull-stream that emits an array of all ConnHub entries whenever any connection updates (i.e. changes it state: connecting, disconnecting, connected, etc). |
+| **`remember(addr, data?)`** | `sync` | Stores (in cold storage) connection information about a new peer, known by its multiserver address `addr` and additional optional `data` (as an object). |
+| **`forget(addr)`** | `sync` | Removes (from cold storage) connection information about a peer known by its multiserver address `addr`. |
+| **`dbPeers()`** | `sync` | Returns an Iterable of ConnDB entries known at the moment. Does not reactively update once the database is written to. |
 | **`stage(addr, data?)`** | `sync` | Registers a suggested connection to a new peer, known by its multiserver address `addr` and additional optional `data` (as an object). |
 | **`unstage(addr)`** | `sync` | Unregisters a suggested connection the peer known by its multiserver address `addr`. |
 | **`stagedPeers()`** | `source` | A pull-stream that emits an array of all ConnStaging entries whenever any staging status updates (upon stage() or unstage()). |
 | **`start()`** | `sync` | Triggers the start of the connection scheduler in CONN. |
 | **`stop()`** | `sync` | Stops the CONN scheduler if it is currently active. |
-| **`ping()`** | `duplex` | A duplex pull-stream for periodically pinging with peers, fully compatible with `ssb.gossip.ping`. |
-| **`db()`** | `sync` | Returns the instance of [ConnDB](https://github.com/staltz/ssb-conn-db) currently in use. |
-| **`hub()`** | `sync` | Returns the instance of [ConnHub](https://github.com/staltz/ssb-conn-hub) currently in use. |
-| **`staging()`** | `sync` | Returns the instance of [ConnStaging](https://github.com/staltz/ssb-conn-staging) currently in use. |
-| **`query()`** | `sync` | Returns the instance of [ConnQuery](https://github.com/staltz/ssb-conn-query) currently in use. |
 
 An "entry" is a (tuple) array of form:
 
@@ -117,6 +112,39 @@ Fields marked 🔷 are important and often used, fields marked 🔹 come from CO
 🔸 `onlineCount?: number`: (only if `type = 'room'`) the number of room endpoints currently connected to this room
 
 </details>
+
+## Advanced API
+
+CONN also provides more detailed APIs by giving you access to the internals, ConnDB, ConnHub, ConnStaging, ConnQuery. These are APIs that we discourage using, simply because in the vast majority of the cases, the basic API is enough (you might just need a few pull-stream operators on the basic APIs), but if you know what you're doing, don't feel afraid to use the advanced APIs!
+
+| API | Type | Description |
+|-----|------|-------------|
+| **`ssb.conn.ping()`** | `duplex` | A duplex pull-stream for periodically pinging with peers, fully compatible with `ssb.gossip.ping`. |
+| **`sbb.conn.db()`** | `sync` | Returns the instance of [ConnDB](https://github.com/staltz/ssb-conn-db) currently in use. Read their docs to get access to more APIs. |
+| **`ssb.conn.hub()`** | `sync` | Returns the instance of [ConnHub](https://github.com/staltz/ssb-conn-hub) currently in use. Read their docs to get access to more APIs. |
+| **`ssb.conn.staging()`** | `sync` | Returns the instance of [ConnStaging](https://github.com/staltz/ssb-conn-staging) currently in use. Read their docs to get access to more APIs. |
+| **`ssb.conn.query()`** | `sync` | Returns the instance of [ConnQuery](https://github.com/staltz/ssb-conn-query) currently in use. Read their docs to get access to more APIs. |
+
+
+## (Deprecated) Gossip API
+
+The following gossip plugin APIs are available once you install CONN, but **these will emit deprecation warnings and might behave slightly different than the old gossip plugin**:
+
+| API | Type |
+|-----|------|
+| **`ssb.gossip.peers()`** | `sync` |
+| **`ssb.gossip.get(p)`** | `sync` |
+| **`ssb.gossip.connect(p)`** | `async` |
+| **`ssb.gossip.disconnect(p)`** | `async` |
+| **`ssb.gossip.changes()`** | `source` |
+| **`ssb.gossip.add(p, source)`** | `sync` |
+| **`ssb.gossip.remove(p)`** | `sync` |
+| **`ssb.gossip.ping()`** | `duplex` |
+| **`ssb.gossip.reconnect()`** | `sync` |
+| **`ssb.gossip.enable()`** | `sync` |
+| **`ssb.gossip.disable()`** | `sync` |
+
+If you want to use the new CONN infrastructure but preserve the same gossip behavior as before, use [`ssb-legacy-conn`](https://github.com/staltz/ssb-legacy-conn) which tries to mirror the gossip plugin, even its log messages.
 
 ## Recipes
 
@@ -206,26 +234,6 @@ Some parameters in CONN can be configured by the user or by application code thr
   }
 }
 ```
-
-## Gossip compatibility
-
-The following gossip plugin APIs are available once you install CONN, but **these will emit deprecation warnings and might behave slightly different than the old gossip plugin**:
-
-| API | Type |
-|-----|------|
-| **`ssb.gossip.peers()`** | `sync` |
-| **`ssb.gossip.get(p)`** | `sync` |
-| **`ssb.gossip.connect(p)`** | `async` |
-| **`ssb.gossip.disconnect(p)`** | `async` |
-| **`ssb.gossip.changes()`** | `source` |
-| **`ssb.gossip.add(p, source)`** | `sync` |
-| **`ssb.gossip.remove(p)`** | `sync` |
-| **`ssb.gossip.ping()`** | `duplex` |
-| **`ssb.gossip.reconnect()`** | `sync` |
-| **`ssb.gossip.enable()`** | `sync` |
-| **`ssb.gossip.disable()`** | `sync` |
-
-If you want to use the new CONN infrastructure but preserve the same gossip behavior as before, use [`ssb-legacy-conn`](https://github.com/staltz/ssb-legacy-conn) which tries to mirror the gossip plugin, even its log messages.
 
 ## Learn more
 
