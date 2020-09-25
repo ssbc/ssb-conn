@@ -45,21 +45,21 @@ Now you should be able to access the muxrpc APIs under `ssb.conn` and `ssb.gossi
 
 ## Basic API
 
-Under `ssb.conn.*` you can call any of these APIs in your local peer.
+You can call any of these APIs in your local peer.
 
 | API | Type | Description |
 |-----|------|-------------|
-| **`connect(addr, data?)`** | `async` | Connects to a peer known by its multiserver address `addr`, and stores additional optional `data` (as an object) during its connection lifespan. |
-| **`disconnect(addr)`** | `async` | Disconnects a peer known by its multiserver address `addr`. |
-| **`peers()`** | `source` | A pull-stream that emits an array of all ConnHub entries whenever any connection updates (i.e. changes it state: connecting, disconnecting, connected, etc). |
-| **`remember(addr, data?)`** | `sync` | Stores (in cold storage) connection information about a new peer, known by its multiserver address `addr` and additional optional `data` (as an object). |
-| **`forget(addr)`** | `sync` | Removes (from cold storage) connection information about a peer known by its multiserver address `addr`. |
-| **`dbPeers()`** | `sync` | Returns an Iterable of ConnDB entries known at the moment. Does not reactively update once the database is written to. |
-| **`stage(addr, data?)`** | `sync` | Registers a suggested connection to a new peer, known by its multiserver address `addr` and additional optional `data` (as an object). |
-| **`unstage(addr)`** | `sync` | Unregisters a suggested connection the peer known by its multiserver address `addr`. |
-| **`stagedPeers()`** | `source` | A pull-stream that emits an array of all ConnStaging entries whenever any staging status updates (upon stage() or unstage()). |
-| **`start()`** | `sync` | Triggers the start of the connection scheduler in CONN. |
-| **`stop()`** | `sync` | Stops the CONN scheduler if it is currently active. |
+| **`ssb.conn.connect(addr, data?)`** | `async` | Connects to a peer known by its multiserver address `addr`, and stores additional optional `data` (as an object) during its connection lifespan. |
+| **`ssb.conn.disconnect(addr)`** | `async` | Disconnects a peer known by its multiserver address `addr`. |
+| **`ssb.conn.peers()`** | `source` | A pull-stream that emits an array of all ConnHub entries whenever any connection updates (i.e. changes it state: connecting, disconnecting, connected, etc). |
+| **`ssb.conn.remember(addr, data?)`** | `sync` | Stores (in cold storage) connection information about a new peer, known by its multiserver address `addr` and additional optional `data` (as an object). |
+| **`ssb.conn.forget(addr)`** | `sync` | Removes (from cold storage) connection information about a peer known by its multiserver address `addr`. |
+| **`ssb.conn.dbPeers()`** | `sync` | Returns an Iterable of ConnDB entries known at the moment. Does not reactively update once the database is written to. |
+| **`ssb.conn.stage(addr, data?)`** | `sync` | Registers a suggested connection to a new peer, known by its multiserver address `addr` and additional optional `data` (as an object). |
+| **`ssb.conn.unstage(addr)`** | `sync` | Unregisters a suggested connection the peer known by its multiserver address `addr`. |
+| **`ssb.conn.stagedPeers()`** | `source` | A pull-stream that emits an array of all ConnStaging entries whenever any staging status updates (upon stage() or unstage()). |
+| **`ssb.conn.start()`** | `sync` | Triggers the start of the connections scheduler in CONN. |
+| **`ssb.conn.stop()`** | `sync` | Stops the scheduler if it is currently active. |
 
 An "entry" is a (tuple) array of form:
 
