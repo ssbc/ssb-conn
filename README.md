@@ -150,7 +150,19 @@ pull(
 
 **How can I _immediately_ get all currently connected peers?**
 
-If you're not interested in updates, but just want to make a single request/response for the currently connected peers, you use `ssb.conn.peers()` plus some pull-stream operators:
+[ssb-conn-query](https://github.com/staltz/ssb-conn-query) has APIs for that and others, e.g.
+
+```js
+var arr = ssb.conn.query().peersConnected()
+
+console.log(arr)
+// [
+//   ['net:192.168.1...', {key: '@Ql...', ...}], 
+//   ['net:192.168.2...', {key: '@ye...', ...}]
+// ]
+```
+
+If the above doesn't work (for instance, `conn.query()` is not available in the CLI and other similar cases), you can use `ssb.conn.peers()` plus some pull-stream operators:
 
 ```js
 function getConnectedPeersNow(cb) {
