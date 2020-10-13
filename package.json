@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "debug": "~4.1.1",
-    "has-network2": "0.0.2",
+    "has-network2": "0.0.x",
     "ip": "^1.1.5",
     "on-change-network-strict": "1.0.0",
     "on-wakeup": "^1.0.1",
