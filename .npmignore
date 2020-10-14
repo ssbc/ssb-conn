@@ -1,0 +1,11 @@
+.github
+.vscode
+node_modules
+src/
+test/
+.gitignore
+CHANGELOG.md
+diagram.png
+pnpm-lock.yaml
+shrinkwrap.yaml
+tsconfig.json
