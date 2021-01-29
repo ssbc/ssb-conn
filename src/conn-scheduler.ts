@@ -113,7 +113,7 @@ type Pausable = {pause: CallableFunction; resume: CallableFunction};
 export class ConnScheduler {
   private readonly ssb: {conn: CONN; [name: string]: any};
   private readonly config: Config;
-  private readonly hasSsbDb: boolean;
+  private readonly hasSsbDb2: boolean;
   private pubDiscoveryPausable?: Pausable;
   private intervalForUpdate?: NodeJS.Timeout;
   private closed: boolean;
@@ -125,16 +125,16 @@ export class ConnScheduler {
   constructor(ssb: any, config: any) {
     this.ssb = ssb;
     this.config = config;
-    this.hasSsbDb = !!this.ssb.post && !!this.ssb.messagesByType;
+    this.hasSsbDb2 = !!this.ssb.db?.post && !!this.ssb.db?.query;
     this.closed = true;
     this.lastMessageAt = 0;
     this.hasScheduledAnUpdate = false;
     this.isLoadingHops = false;
     this.hops = {};
 
-    if (this.hasSsbDb) {
-      this.ssb.post((msg: Msg) => {
-        if (msg.value.author != this.ssb.id) {
+    if (this.hasSsbDb2) {
+      this.ssb.db.post((msg: Msg) => {
+        if (msg.value.author !== this.ssb.id) {
           this.lastMessageAt = Date.now();
         }
         if (msg.value.content?.type === 'contact') {
@@ -360,7 +360,7 @@ export class ConnScheduler {
 
   private updateNow() {
     if (this.closed) return;
-    if (this.hasSsbDb && !this.ssb.ready()) return;
+    if (this.hasSsbDb2 && !this.ssb.ready()) return;
     if (this.isCurrentlyDownloading()) return;
     if (this.isLoadingHops) return;
 
@@ -398,8 +398,8 @@ export class ConnScheduler {
   private setupPubDiscovery() {
     if (this.config.conn?.populatePubs === false) return;
 
-    if (!this.hasSsbDb) {
-      debug('Warning: ssb-db is missing, scheduling will miss some info');
+    if (!this.hasSsbDb2) {
+      debug('Warning: ssb-db2 is missing, scheduling will miss some info');
       return;
     }
 
@@ -407,11 +407,11 @@ export class ConnScheduler {
       if (this.closed) return;
       type PubContent = {address?: string};
       const MAX_STAGED_PUBS = 3;
+      const {and, type, live, toPullStream} = this.ssb.db.operators;
       this.pubDiscoveryPausable = this.pubDiscoveryPausable ?? Pausable();
 
       pull(
-        this.ssb.messagesByType({type: 'pub', live: true, keys: false}),
-        pull.filter((msg: any) => !msg.sync),
+        this.ssb.db.query(and(type('pub')), live({old: true}), toPullStream()),
         // Don't drain that fast, so to give other DB draining tasks priority
         pull.asyncMap((x: any, cb: any) => setTimeout(() => cb(null, x), 250)),
         pull.filter(
