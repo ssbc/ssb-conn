@@ -360,7 +360,6 @@ export class ConnScheduler {
 
   private updateNow() {
     if (this.closed) return;
-    if (this.hasSsbDb2 && !this.ssb.ready()) return;
     if (this.isCurrentlyDownloading()) return;
     if (this.isLoadingHops) return;
 
