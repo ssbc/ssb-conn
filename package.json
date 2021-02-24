@@ -10,7 +10,7 @@
     "url": "git://github.com/staltz/ssb-conn.git"
   },
   "dependencies": {
-    "debug": "~4.2.0",
+    "debug": "^4.3.0",
     "has-network2": ">=0.0.3",
     "ip": "^1.1.5",
     "on-change-network-strict": "1.0.0",
@@ -20,14 +20,14 @@
     "pull-ping": "^2.0.3",
     "pull-stream": "^3.6.14",
     "secret-stack-decorators": "1.1.0",
-    "ssb-conn-db": "~0.3.3",
-    "ssb-conn-hub": "~0.2.7",
-    "ssb-conn-query": "~0.4.6",
-    "ssb-conn-staging": "~0.1.0",
-    "ssb-ref": "^2.14.2",
-    "ssb-typescript": "^2.1.0",
+    "ssb-conn-db": "~1.0.0",
+    "ssb-conn-hub": "~1.0.0",
+    "ssb-conn-query": "~1.0.0",
+    "ssb-conn-staging": "~1.0.0",
+    "ssb-ref": "^2.14.3",
+    "ssb-typescript": "^2.2.0",
     "statistics": "^3.3.0",
-    "zii": "~1.1.0"
+    "zii": "~1.1.1"
   },
   "peerDependencies": {
     "secret-stack": ">=6.2.0"
@@ -35,13 +35,13 @@
   "devDependencies": {
     "@types/node": "^14.11.8",
     "cont": "^1.0.3",
-    "secret-stack": "^6.3.1",
+    "secret-stack": "^6.3.2",
     "ssb-caps": "~1.1.0",
     "ssb-lan": "~0.2.0",
     "ssb-server": "~16.0.1",
-    "ssb-db2": "1.7.0",
-    "tape": "^5.0.1",
-    "typescript": "4.0.3"
+    "ssb-db2": "1.17.2",
+    "tape": "^5.2.0",
+    "typescript": "4.2.2"
   },
   "scripts": {
     "typescript": "tsc",
