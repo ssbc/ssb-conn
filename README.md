@@ -21,6 +21,7 @@ Also known as *"The Gossip Refactor"*, the *CONN* (Connections Over Numerous Net
 
 - Requires **Node.js 6.5** or higher
 - Requires `secret-stack@^6.2.0`
+- The default scheduler in `ssb-conn@2.0.0` (or higher) **requires ssb-db2**. `ssb-conn@1.0.0` supports `ssb-db`
 
 ```
 npm install --save ssb-conn
@@ -33,8 +34,8 @@ Add this plugin to ssb-server like this:
      .use(require('ssb-onion'))
      .use(require('ssb-unix-socket'))
      .use(require('ssb-no-auth'))
-     .use(require('ssb-plugins'))
      .use(require('ssb-master'))
+     .use(require('ssb-db2'))
 +    .use(require('ssb-conn'))
      .use(require('ssb-replicate'))
      .use(require('ssb-friends'))
@@ -68,8 +69,8 @@ An "entry" is a (tuple) array of form:
 ```
  where:
  - `addr` is a multiserver address (a **string** that [follows some rules](https://github.com/dominictarr/multiserver-address))
- - `data` is an **object** with additional information about the peer 
- 
+ - `data` is an **object** with additional information about the peer
+
 <details>
   <summary>Full details on fields present in <code>data</code> (click here)</summary>
 
@@ -155,7 +156,7 @@ You can use `ssb.conn.peers()` to get a stream of "all peers currently being pro
 ```js
 var connectedPeersStream = pull(
   ssb.conn.peers(),
-  pull.map(entries => 
+  pull.map(entries =>
     entries.filter(([addr, data]) => data.state === 'connected')
   )
 )
@@ -167,9 +168,9 @@ Then you can drain the stream to get an array of connected peers:
 pull(
   connectedPeersStream,
   pull.drain(connectedPeers => {
-    console.log(connectedPeers) 
+    console.log(connectedPeers)
     // [
-    //   ['net:192.168.1...', {key: '@Ql...', ...}], 
+    //   ['net:192.168.1...', {key: '@Ql...', ...}],
     //   ['net:192.168.2...', {key: '@ye...', ...}]
     // ]
   })
@@ -185,7 +186,7 @@ var arr = ssb.conn.query().peersConnected()
 
 console.log(arr)
 // [
-//   ['net:192.168.1...', {key: '@Ql...', ...}], 
+//   ['net:192.168.1...', {key: '@Ql...', ...}],
 //   ['net:192.168.2...', {key: '@ye...', ...}]
 // ]
 ```
@@ -196,7 +197,7 @@ If the above doesn't work (for instance, `conn.query()` is not available in the 
 function getConnectedPeersNow(cb) {
   pull(
     ssb.conn.peers(),
-    pull.map(entries => 
+    pull.map(entries =>
       entries.filter(([addr, data]) => data.state === 'connected')
     )
     pull.take(1), // This is important
