@@ -20,7 +20,7 @@
     "pull-ping": "^2.0.3",
     "pull-stream": "^3.6.14",
     "secret-stack-decorators": "1.1.0",
-    "ssb-conn-db": "~1.0.0",
+    "ssb-conn-db": "~1.0.1",
     "ssb-conn-hub": "~1.0.0",
     "ssb-conn-query": "~1.0.0",
     "ssb-conn-staging": "~1.0.0",
