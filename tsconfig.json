@@ -16,7 +16,7 @@
     "downlevelIteration": true,
     "moduleResolution": "node",
     "experimentalDecorators": true,
-    "types": ["node", "zii"],
+    "types": ["node", "ziii"],
     "esModuleInterop": false
   },
   "exclude": ["node_modules", "test", "lib"]

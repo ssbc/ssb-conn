@@ -1,13 +1,12 @@
-import ConnQuery = require('ssb-conn-query');
+import z from 'ziii';
+import {Msg, FeedId} from 'ssb-typescript';
+import {plugin, muxrpc} from 'secret-stack-decorators';
 import {AddressData as DBData} from 'ssb-conn-db/lib/types';
 import {ListenEvent as HubEvent} from 'ssb-conn-hub/lib/types';
 import {StagedData} from 'ssb-conn-staging/lib/types';
+import ConnQuery = require('ssb-conn-query');
 import {Peer} from 'ssb-conn-query/lib/types';
 import {Discovery as LANDiscovery} from 'ssb-lan/lib/types';
-import {Msg, FeedId} from 'ssb-typescript';
-import {plugin, muxrpc} from 'secret-stack-decorators';
-import {CONN} from './conn';
-import {Config} from './types';
 const pull = require('pull-stream');
 const Pausable = require('pull-pause');
 const ip = require('ip');
@@ -16,7 +15,8 @@ const onNetwork = require('on-change-network-strict');
 const hasNetwork = require('has-network2');
 const Ref = require('ssb-ref');
 const debug = require('debug')('ssb:conn:scheduler');
-require('zii');
+import {CONN} from './conn';
+import {Config} from './types';
 
 let lastCheck = 0;
 let lastValue: any = null;
@@ -209,23 +209,21 @@ export class ConnScheduler {
     const freeSlots = Math.max(quota - peersUp.length, 0);
 
     // Disconnect from excess
-    peersUp
+    z(peersUp)
       .z(sortByStateChange)
       .z(take(excess))
       .forEach(([addr]) => this.ssb.conn.disconnect(addr));
 
     // Connect to suitable candidates
-    peersDown
-      .filter(p => !this.weBlockThem(p))
-      .filter(canBeConnected)
-      .filter(([, data]) => data.autoconnect !== false)
+    z(peersDown)
+      .z(peers => peers.filter(p => !this.weBlockThem(p)))
+      .z(peers => peers.filter(canBeConnected))
+      .z(peers => peers.filter(([, data]) => data.autoconnect !== false))
       .z(passesGroupDebounce(groupMin))
-      .filter(passesExpBackoff(backoffStep, backoffMax))
+      .z(peers => peers.filter(passesExpBackoff(backoffStep, backoffMax)))
       .z(peers =>
         // with 30% chance, ignore 'bestness' and just choose randomly
-        Math.random() <= 0.3
-          ? peers.z(shufflePeers)
-          : peers.z(sortByStateChange),
+        Math.random() <= 0.3 ? shufflePeers(peers) : sortByStateChange(peers),
       )
       .z(take(freeSlots))
       .forEach(([addr, data]) => this.ssb.conn.connect(addr, data));
@@ -323,10 +321,7 @@ export class ConnScheduler {
     });
 
     // Automatically connect to some (up to 3) staged peers we follow
-    conn
-      .query()
-      .peersConnectable('staging')
-      .filter(this.weFollowThem)
+    z(conn.query().peersConnectable('staging').filter(this.weFollowThem))
       .z(
         take(
           3 - conn.query().peersInConnection().filter(this.weFollowThem).length,

@@ -27,7 +27,7 @@
     "ssb-ref": "^2.14.3",
     "ssb-typescript": "^2.2.0",
     "statistics": "^3.3.0",
-    "zii": "~1.1.1"
+    "ziii": "~1.0.1"
   },
   "peerDependencies": {
     "secret-stack": ">=6.2.0"
