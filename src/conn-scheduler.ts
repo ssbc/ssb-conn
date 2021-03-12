@@ -1,4 +1,4 @@
-import z from 'ziii';
+import z = require('ziii');
 import {Msg, FeedId} from 'ssb-typescript';
 import {plugin, muxrpc} from 'secret-stack-decorators';
 import {AddressData as DBData} from 'ssb-conn-db/lib/types';
