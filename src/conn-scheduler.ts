@@ -413,14 +413,13 @@ export class ConnScheduler {
         this.ssb.db.query(and(type('pub')), live({old: true}), toPullStream()),
         // Don't drain that fast, so to give other DB draining tasks priority
         pull.asyncMap((x: any, cb: any) => setTimeout(() => cb(null, x), 250)),
-        pull.filter(
-          (msg: Msg<PubContent>['value']) =>
-            msg.content?.address && Ref.isAddress(msg.content.address),
+        pull.filter((msg: Msg<PubContent>) =>
+          Ref.isAddress(msg.value.content?.address),
         ),
         this.pubDiscoveryPausable,
-        pull.drain((msg: Msg<PubContent>['value']) => {
+        pull.drain((msg: Msg<PubContent>) => {
           try {
-            const address = Ref.toMultiServerAddress(msg.content.address!);
+            const address = Ref.toMultiServerAddress(msg.value.content.address);
             const key = Ref.getKeyFromAddress(address);
             if (this.weBlockThem([address, {key}])) {
               this.ssb.conn.forget(address);
