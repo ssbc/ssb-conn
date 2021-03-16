@@ -6,7 +6,7 @@
 
 </div>
 
-Also known as *"The Gossip Refactor"*, the *CONN* (Connections Over Numerous Networks) plugin replaces the old `gossip` plugin, covering all its use cases. CONN has these responsibilities:
+*CONN* (Connections Over Numerous Networks) plugin replaces the old `gossip` plugin, covering all its use cases. CONN has these responsibilities:
 
 - Persistence of pub (and other servers) addresses (in the file `~/.ssb/conn.json`)
 - Monitoring of all current connections and their state (connecting, disconnecting, etc)
@@ -21,7 +21,13 @@ Also known as *"The Gossip Refactor"*, the *CONN* (Connections Over Numerous Net
 
 - Requires **Node.js 6.5** or higher
 - Requires `secret-stack@^6.2.0`
-- The default scheduler in `ssb-conn@2.0.0` (or higher) **requires ssb-db2**. `ssb-conn@1.0.0` supports `ssb-db`
+
+**Recommended:**
+
+Not required, but:
+
+- The default scheduler in `ssb-conn@>=2.0.0` wants to use `ssb-db2@>=1.18.0` and `ssb-friends@>=4.4.4`
+- The default scheduler in (older) `ssb-conn@1.0.0` wants to use `ssb-db@>=19` and `ssb-friends` 
 
 ```
 npm install --save ssb-conn
