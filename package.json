@@ -21,8 +21,8 @@
     "pull-stream": "^3.6.14",
     "secret-stack-decorators": "1.1.0",
     "ssb-conn-db": "~1.0.1",
-    "ssb-conn-hub": "~1.0.0",
-    "ssb-conn-query": "~1.0.0",
+    "ssb-conn-hub": "~1.1.0",
+    "ssb-conn-query": "~1.1.0",
     "ssb-conn-staging": "~1.0.0",
     "ssb-ref": "^2.14.3",
     "ssb-typescript": "^2.2.0",
@@ -37,11 +37,11 @@
     "cont": "^1.0.3",
     "secret-stack": "^6.3.2",
     "ssb-caps": "~1.1.0",
-    "ssb-lan": "~0.2.0",
+    "ssb-lan": "~1.0.0",
     "ssb-server": "~16.0.1",
-    "ssb-db2": "1.17.2",
-    "tape": "^5.2.0",
-    "typescript": "4.2.2"
+    "ssb-db2": "~1.18.6",
+    "tape": "^5.2.2",
+    "typescript": "4.2.x"
   },
   "scripts": {
     "typescript": "tsc",
