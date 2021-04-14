@@ -27,7 +27,7 @@
 Not required, but:
 
 - The default scheduler in `ssb-conn@>=2.0.0` wants to use `ssb-db2@>=1.18.0` and `ssb-friends@>=4.4.4`
-- The default scheduler in (older) `ssb-conn@1.0.0` wants to use `ssb-db@>=19` and `ssb-friends` 
+- The default scheduler in (older) `ssb-conn@1.0.0` wants to use `ssb-db@>=19` and `ssb-friends`
 
 ```
 npm install --save ssb-conn
@@ -135,23 +135,13 @@ CONN also provides more detailed APIs by giving you access to the internals, Con
 
 ## (Deprecated) Gossip API
 
-The following gossip plugin APIs are available once you install CONN, but **these will emit deprecation warnings and might behave slightly different than the old gossip plugin**:
+The following gossip plugin APIs are available once you install CONN:
 
 | API | Type |
 |-----|------|
-| **`ssb.gossip.peers()`** | `sync` |
-| **`ssb.gossip.get(p)`** | `sync` |
-| **`ssb.gossip.connect(p)`** | `async` |
-| **`ssb.gossip.disconnect(p)`** | `async` |
-| **`ssb.gossip.changes()`** | `source` |
-| **`ssb.gossip.add(p, source)`** | `sync` |
-| **`ssb.gossip.remove(p)`** | `sync` |
 | **`ssb.gossip.ping()`** | `duplex` |
-| **`ssb.gossip.reconnect()`** | `sync` |
-| **`ssb.gossip.enable()`** | `sync` |
-| **`ssb.gossip.disable()`** | `sync` |
 
-If you want to use the new CONN infrastructure but preserve the same gossip behavior as before, use [`ssb-legacy-conn`](https://github.com/staltz/ssb-legacy-conn) which tries to mirror the gossip plugin, even its log messages.
+If you want to use other legacy `ssb.gossip.*` APIs and preserve the same gossip behavior as before, use [`ssb-legacy-conn`](https://github.com/staltz/ssb-legacy-conn) which uses parts of CONN and tries to mirrors the old gossip plugin as closely as possible, even its log messages.
 
 ## Recipes
 
