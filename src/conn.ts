@@ -39,7 +39,7 @@ export class CONN {
 
   private setupCloseHook() {
     const that = this;
-    this.ssb.close.hook(function(this: any, fn: Function, args: Array<any>) {
+    this.ssb.close.hook(function (this: any, fn: Function, args: Array<any>) {
       that.stopScheduler();
       that._db.close();
       that._hub.close();
@@ -187,24 +187,5 @@ export class CONN {
   @muxrpc('sync')
   public query = () => this._query;
 
-  @muxrpc('sync')
-  public internalConnDB = () => {
-    console.error('DEPRECATED conn.internalConnDB(), use conn.db() instead');
-    return this._db;
-  };
-
-  @muxrpc('sync')
-  public internalConnHub = () => {
-    console.error('DEPRECATED conn.internalConnHub(), use conn.hub() instead');
-    return this._hub;
-  };
-
-  @muxrpc('sync')
-  public internalConnStaging = () => {
-    console.error(
-      'DEPRECATED conn.internalConnStaging(), use conn.staging() instead',
-    );
-    return this._staging;
-  };
   //#endregion
 }
