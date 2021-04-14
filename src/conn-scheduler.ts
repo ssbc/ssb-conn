@@ -401,16 +401,20 @@ export class ConnScheduler {
       if (this.closed) return;
       type PubContent = {address?: string};
       const MAX_STAGED_PUBS = 3;
-      const {and, type, live, toPullStream} = this.ssb.db.operators;
+      const {where, type, live, toPullStream} = this.ssb.db.operators;
       this.pubDiscoveryPausable = this.pubDiscoveryPausable ?? Pausable();
 
       pull(
-        this.ssb.db.query(and(type('pub')), live({old: true}), toPullStream()),
-        // Don't drain that fast, so to give other DB draining tasks priority
-        pull.asyncMap((x: any, cb: any) => setTimeout(() => cb(null, x), 250)),
+        this.ssb.db.query(
+          where(type('pub')),
+          live({old: true}),
+          toPullStream(),
+        ),
         pull.filter((msg: Msg<PubContent>) =>
           Ref.isAddress(msg.value.content?.address),
         ),
+        // Don't drain that fast, so to give other DB draining tasks priority
+        pull.asyncMap((x: any, cb: any) => setTimeout(() => cb(null, x), 250)),
         this.pubDiscoveryPausable,
         pull.drain((msg: Msg<PubContent>) => {
           try {
