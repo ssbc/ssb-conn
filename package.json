@@ -40,13 +40,14 @@
     "ssb-db2": "~2.1.1",
     "ssb-lan": "~1.0.0",
     "ssb-server": "~16.0.1",
-    "ssb-db2": "~2.0.0",
+    "tap-bail": "^1.0.0",
+    "tap-spec": "^5.0.0",
     "tape": "^5.2.2",
     "typescript": "~4.2.4"
   },
   "scripts": {
     "typescript": "tsc",
-    "tape": "set -e; for t in test/*.js; do node $t; done",
+    "tape": "tape test/*.js | tap-bail | tap-spec",
     "test": "npm run typescript && npm run tape"
   },
   "author": "Andre Staltz <contact@staltz.com> (http://staltz.com)",
