@@ -208,11 +208,18 @@ export class ConnScheduler {
     const excess = peersUp.length > quota * 2 ? peersUp.length - quota : 0;
     const freeSlots = Math.max(quota - peersUp.length, 0);
 
-    // Disconnect from excess
+    // Disconnect from excess, after some long and random delay
     z(peersUp)
       .z(sortByStateChange)
       .z(take(excess))
-      .forEach(([addr]) => this.ssb.conn.disconnect(addr));
+      .forEach(([addr]) => {
+        // Wait 2min, with +-50% randomization, but the more excess peers
+        // there are, the smaller wait we'll have
+        const fuzzyPeriod = (120e3 * (0.5 + Math.random())) / excess;
+        setTimeout(() => {
+          this.ssb.conn.disconnect(addr);
+        }, fuzzyPeriod);
+      });
 
     // Connect to suitable candidates
     z(peersDown)
