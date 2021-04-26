@@ -1,3 +1,11 @@
+# 3.2.0
+
+- Improve the scheduler: disconnect to excess peers after a long and random delay that is inversely proportional to the size of the excess. The randomization is important to avoid "back and forth dances" where remote peers connect to you, but you disconnect from them, which leads them to immediately attempt a reconnect to you, and so forth
+
+# 3.1.0
+
+- If already connected to a peer, `ssb.conn.connect()` will just return the RPC instance of that connected peer, instead of `false`. See https://github.com/staltz/ssb-conn-hub/commit/7a8a880d4abf74cc916febbe6efe441a23aed590
+
 # 3.0.0
 
 - Drop support for `ssb.gossip.*` APIs, except `ssb.gossip.ping`
