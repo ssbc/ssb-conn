@@ -1,3 +1,7 @@
+# 3.2.1
+
+- Updated ssb-conn-db to use atomic-file-rw which should be more robust than before, causing less corrupted conn.json saves to the filesystems.
+
 # 3.2.0
 
 - Improve the scheduler: disconnect to excess peers after a long and random delay that is inversely proportional to the size of the excess. The randomization is important to avoid "back and forth dances" where remote peers connect to you, but you disconnect from them, which leads them to immediately attempt a reconnect to you, and so forth
