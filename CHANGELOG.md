@@ -1,3 +1,7 @@
+# 4.0.0
+
+- Change return type of `ssb.conn.dbPeers()` to array, not iterable
+
 # 3.2.1
 
 - Updated ssb-conn-db to use atomic-file-rw which should be more robust than before, causing less corrupted conn.json saves to the filesystems.
