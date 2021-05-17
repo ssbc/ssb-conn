@@ -2,7 +2,6 @@ import ConnDB = require('ssb-conn-db');
 import ConnHub = require('ssb-conn-hub');
 import ConnStaging = require('ssb-conn-staging');
 import ConnQuery = require('ssb-conn-query');
-import {AddressData} from 'ssb-conn-db/lib/types';
 import {StagedData} from 'ssb-conn-staging/lib/types';
 import {plugin, muxrpc} from 'secret-stack-decorators';
 import {Callback} from './types';
@@ -100,7 +99,7 @@ export class CONN {
   };
 
   @muxrpc('sync')
-  public dbPeers = () => this._db.entries() as Iterable<[string, AddressData]>;
+  public dbPeers = () => [...this._db.entries()];
 
   @muxrpc('async')
   public connect = (
