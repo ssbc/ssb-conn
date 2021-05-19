@@ -63,7 +63,7 @@ type Type =
   | 'dht'
   | 'pub'
   | 'room'
-  | 'room-endpoint'
+  | 'room-attendant'
   | '?';
 
 function detectType(peer: Peer): Type {
@@ -74,7 +74,8 @@ function detectType(peer: Peer): Type {
   if (data.type === 'dht') return 'dht';
   if (data.type === 'pub') return 'pub';
   if (data.type === 'room') return 'room';
-  if (data.type === 'room-endpoint') return 'room-endpoint';
+  if (data.type === 'room-endpoint') return 'room-attendant'; // legacy
+  if (data.type === 'room-attendant') return 'room-attendant';
   if (data.source === 'local') return 'lan';
   if (data.source === 'pub') return 'pub';
   if (data.source === 'internet') return 'internet';
