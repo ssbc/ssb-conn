@@ -210,7 +210,7 @@ pull(
 
 
 <details>
-  <summary>How can I _immediately_ get all currently connected peers? (click here)</summary>
+  <summary>How can I <em>immediately</em> get all currently connected peers? (click here)</summary>
   <p>
 
 [ssb-conn-query](https://github.com/staltz/ssb-conn-query) has APIs for that and others, e.g.
