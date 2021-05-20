@@ -272,6 +272,7 @@ The default scheduler is roughly the same as the legacy ssb-gossip plugin, with 
 **Discovery setup:**
 
 - Read the SSB log and look for "pub" messages, and `remember` them
+- Listen to a stream of LAN peers (see [ssb-lan](https://github.com/staltz/ssb-lan)), and `stage` them
 - Listen to a stream of Bluetooth nearby devices, and `stage` them
 
 **Periodic connections/disconnections:**
