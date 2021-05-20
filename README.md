@@ -143,9 +143,39 @@ The following gossip plugin APIs are available once you install CONN:
 
 If you want to use other legacy `ssb.gossip.*` APIs and preserve the same gossip behavior as before, use [`ssb-legacy-conn`](https://github.com/staltz/ssb-legacy-conn) which uses parts of CONN and tries to mirrors the old gossip plugin as closely as possible, even its log messages.
 
+## Config
+
+Some parameters in CONN can be configured by the user or by application code through the conventional [ssb-config](https://github.com/ssbc/ssb-config). The possible options are listed below:
+
+```typescript
+{
+  "conn": {
+    /**
+     * Whether the CONN scheduler should start automatically as soon as the
+     * SSB app is initialized. Default is `true`.
+     */
+    "autostart": boolean,
+
+    /**
+     * How far in the social graph should a peer be automatically connected to
+     * whenever possible. Default value (when this is unspecified) is `1`.
+     */
+    "hops": number,
+
+    /**
+     * Whether the CONN scheduler should look into the SSB database looking for
+     * messages of type 'pub' and add them to CONN. Default is `true`.
+     */
+    "populatePubs": boolean,
+  }
+}
+```
+
 ## Recipes
 
-**How can I get a pull stream of all currently connected peers?**
+<details>
+  <summary>How can I get a pull stream of all currently connected peers? (click here)</summary>
+  <p>
 
 You can use `ssb.conn.peers()` to get a stream of "all peers currently being processed" and then use Array `filter` to pick only peers that are strictly *connected*, ignoring those that are *connecting* or *disconnecting*:
 
@@ -173,7 +203,15 @@ pull(
 )
 ```
 
-**How can I _immediately_ get all currently connected peers?**
+<ul></ul>
+
+  </p>
+</details>
+
+
+<details>
+  <summary>How can I _immediately_ get all currently connected peers? (click here)</summary>
+  <p>
 
 [ssb-conn-query](https://github.com/staltz/ssb-conn-query) has APIs for that and others, e.g.
 
@@ -204,33 +242,10 @@ function getConnectedPeersNow(cb) {
 getConnectedPeersNow(arr => console.log(arr))
 ```
 
-## Config
+<ul></ul>
 
-Some parameters in CONN can be configured by the user or by application code through the conventional [ssb-config](https://github.com/ssbc/ssb-config). The possible options are listed below:
-
-```typescript
-{
-  "conn": {
-    /**
-     * Whether the CONN scheduler should start automatically as soon as the
-     * SSB app is initialized. Default is `true`.
-     */
-    "autostart": boolean,
-
-    /**
-     * How far in the social graph should a peer be automatically connected to
-     * whenever possible. Default value (when this is unspecified) is `1`.
-     */
-    "hops": number,
-
-    /**
-     * Whether the CONN scheduler should look into the SSB database looking for
-     * messages of type 'pub' and add them to CONN. Default is `true`.
-     */
-    "populatePubs": boolean,
-  }
-}
-```
+  </p>
+</details>
 
 ## Learn more
 
