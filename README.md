@@ -56,8 +56,8 @@ You can call any of these APIs in your local peer.
 
 | API | Type | Description |
 |-----|------|-------------|
-| **`ssb.conn.connect(addr, data?)`** | `async` | Connects to a peer known by its multiserver address `addr`, and stores additional optional `data` (as an object) during its connection lifespan. |
-| **`ssb.conn.disconnect(addr)`** | `async` | Disconnects a peer known by its multiserver address `addr`. |
+| **`ssb.conn.connect(addr, data?, cb)`** | `async` | Connects to a peer known by its multiserver address `addr`, and stores additional optional `data` (as an object) during its connection lifespan. |
+| **`ssb.conn.disconnect(addr, cb)`** | `async` | Disconnects a peer known by its multiserver address `addr`. |
 | **`ssb.conn.peers()`** | `source` | A pull-stream that emits an array of all ConnHub entries whenever any connection updates (i.e. changes it state: connecting, disconnecting, connected, etc). |
 | **`ssb.conn.remember(addr, data?)`** | `sync` | Stores (in cold storage) connection information about a new peer, known by its multiserver address `addr` and additional optional `data` (as an object). |
 | **`ssb.conn.forget(addr)`** | `sync` | Removes (from cold storage) connection information about a peer known by its multiserver address `addr`. |
