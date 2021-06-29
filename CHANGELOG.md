@@ -1,3 +1,8 @@
+# 5.0.0
+
+- Scheduler dropped supports for ssb-friends lower than 5.0
+- Scheduler dropped support for `config.conn.hops`
+
 # 4.0.0
 
 - Change return type of `ssb.conn.dbPeers()` to array, not iterable
