@@ -157,12 +157,6 @@ Some parameters in CONN can be configured by the user or by application code thr
     "autostart": boolean,
 
     /**
-     * How far in the social graph should a peer be automatically connected to
-     * whenever possible. Default value (when this is unspecified) is `1`.
-     */
-    "hops": number,
-
-    /**
      * Whether the CONN scheduler should look into the SSB database looking for
      * messages of type 'pub' and add them to CONN. Default is `true`.
      */
@@ -339,34 +333,33 @@ To experiment with your own opinions for establishing connections, you can make 
 Here is the basic shape of the scheduler:
 
 ```javascript
-import {plugin, muxrpc} from 'secret-stack-decorators';
+module.exports = {
+  name: 'connScheduler',
+  version: '1.0.0',
+  manifest: {
+    start: 'sync',
+    stop: 'stop',
+  },
+  init(ssb, config) {
+    return {
+      start() {
+        // this is called when the scheduler should begin making connections
 
-@plugin('1.0.0')
-module.exports = class ConnScheduler {
-  constructor(ssb, config) {
-    // basic setup here
-    this.ssb = ssb;
-  }
+        // You have access to CONN core here:
+        ssb.conn.stage('some multiserver address');
+        ssb.conn.disconnect('another multiserver address');
+        // ...
+      },
 
-  @muxrpc('sync')
-  public start = () => {
-    // this is called when the scheduler should begin scheduling connections
-
-    // You have access to CONN core here:
-    const query = this.ssb.conn.query();
-    this.ssb.conn.stage(addr);
-    this.ssb.conn.disconnect(addr);
-    // ...
-  }
-
-  @muxrpc('sync')
-  public stop = () => {
-    // this is called when the scheduler should cancel its jobs
+      stop() {
+        // this is called when the scheduler should cancel its jobs, if any
+      }
+    }
   }
 }
 ```
 
-Note that the name of the plugin must be **exactly `ConnScheduler`** (or `connScheduler`) and it **must have the methods start() and stop()**, because the CONN core will try to use your scheduler under those names. The rest of the contents of the ConnScheduler class are up to you, you can use private methods, etc.
+Note that the name of the plugin must be **exactly `connScheduler`** (or `connScheduler`) and it **must have the methods start() and stop()**, because the CONN core will try to use your scheduler under those names. The rest of the contents of the ConnScheduler class are up to you, you can use private methods, etc.
 
 When you're done building your scheduler, you can export it together with CONN core and the gossip compatibility plugin like this:
 

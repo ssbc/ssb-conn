@@ -1,3 +1,6 @@
+import {FeedId} from 'ssb-typescript';
+import {CONN} from '../conn';
+
 export type Peer = {
   address?: string;
   key?: string;
@@ -30,7 +33,7 @@ export type Peer = {
   disconnect?: Function;
 };
 
-export type Config = {
+export interface Config {
   /**
    * @deprecated
    * Legacy from ssb-gossip that we probably want to delete soon.
@@ -51,17 +54,32 @@ export type Config = {
     autostart: boolean;
 
     /**
-     * How far in the social graph should a peer be automatically connected to
-     * whenever possible. Default value (when this is unspecified) is `1`.
-     */
-    hops: number;
-
-    /**
      * Whether the CONN scheduler should look into the SSB database looking for
      * messages of type 'pub' and add them to CONN.
      */
     populatePubs: boolean;
   };
-};
+}
+
+export interface SSB {
+  readonly id: FeedId;
+  readonly friends?: Readonly<{
+    graphStream: (opts: {old: boolean; live: boolean}) => CallableFunction;
+  }>;
+  readonly bluetooth?: Readonly<{
+    nearbyScuttlebuttDevices: (x: number) => CallableFunction;
+  }>;
+  readonly lan?: Readonly<{
+    start: () => void;
+    stop: () => void;
+    discoveredPeers: () => CallableFunction;
+  }>;
+  readonly db?: Readonly<{
+    post: (cb: CallableFunction) => CallableFunction;
+    query: (...args: Array<any>) => any;
+    operators: Record<string, any>;
+  }>;
+  readonly conn: CONN;
+}
 
 export type Callback<T> = (err?: any, val?: T) => void;

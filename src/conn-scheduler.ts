@@ -15,8 +15,7 @@ const onNetwork = require('on-change-network-strict');
 const hasNetwork = require('has-network2');
 const Ref = require('ssb-ref');
 const debug = require('debug')('ssb:conn:scheduler');
-import {CONN} from './conn';
-import {Config} from './types';
+import {Config, SSB} from './types';
 
 let lastCheck = 0;
 let lastValue: any = null;
@@ -103,64 +102,61 @@ function shufflePeers(peers: Array<Peer>) {
   return peers.sort(() => Math.random() - 0.5);
 }
 
-const minute = 60e3;
-const hour = 60 * 60e3;
+const MINUTES = 60e3;
+const HOUR = 60 * 60e3;
 
-type BTPeer = {remoteAddress: string; id: string; displayName: string};
+interface BTPeer {
+  remoteAddress: string;
+  id: string;
+  displayName: string;
+}
 
-type Pausable = {pause: CallableFunction; resume: CallableFunction};
+interface Pausable {
+  pause: CallableFunction;
+  resume: CallableFunction;
+}
 
 @plugin('1.0.0')
 export class ConnScheduler {
-  private readonly ssb: {conn: CONN; [name: string]: any};
+  private readonly ssb: SSB;
   private readonly config: Config;
-  private readonly hasSsbDb2: boolean;
   private pubDiscoveryPausable?: Pausable;
   private intervalForUpdate?: NodeJS.Timeout;
+  private ssbDB2Subscription?: CallableFunction | undefined;
   private closed: boolean;
-  private isLoadingHops: boolean;
+  private loadedSocialGraph: boolean;
   private lastMessageAt: number;
   private hasScheduledAnUpdate: boolean;
-  private hops: Record<FeedId, number>;
+  private socialGraph: Record<FeedId, number>;
 
   constructor(ssb: any, config: any) {
     this.ssb = ssb;
     this.config = config;
-    this.hasSsbDb2 = !!this.ssb.db?.post && !!this.ssb.db?.query;
     this.closed = true;
     this.lastMessageAt = 0;
     this.hasScheduledAnUpdate = false;
-    this.isLoadingHops = false;
-    this.hops = {};
-
-    if (this.hasSsbDb2) {
-      this.ssb.db.post((msg: Msg) => {
-        if (msg.value.author !== this.ssb.id) {
-          this.lastMessageAt = Date.now();
-        }
-        if (msg.value.content?.type === 'contact') {
-          this.loadHops(() => this.updateNow());
-        }
-      });
-    }
+    this.loadedSocialGraph = false;
+    this.socialGraph = {};
   }
 
-  private loadHops(doneCallback?: () => void) {
-    if (!this.ssb.friends?.hops) {
-      debug('Warning: ssb-friends is missing, scheduling will miss some info');
+  private loadSocialGraph() {
+    if (!this.ssb.friends?.graphStream) {
+      debug('Warning: ssb-friends@5 is missing, scheduling is degraded');
+      this.loadedSocialGraph = true;
       return;
     }
 
-    this.isLoadingHops = true;
-    this.ssb.friends.hops((err: any, hops: Record<FeedId, number>) => {
-      if (err) {
-        debug('unable to call ssb.friends.hops: %s', err);
-        return;
-      }
-      this.hops = hops;
-      this.isLoadingHops = false;
-      if (doneCallback) doneCallback();
-    });
+    pull(
+      this.ssb.friends?.graphStream({live: true, old: true}),
+      pull.drain((g: Record<FeedId, Record<FeedId, number>>) => {
+        if (g[this.ssb.id]) {
+          const prev = this.socialGraph;
+          const updates = g[this.ssb.id];
+          this.socialGraph = {...prev, ...updates};
+          this.loadedSocialGraph = true;
+        }
+      }),
+    );
   }
 
   private isCurrentlyDownloading() {
@@ -170,16 +166,12 @@ export class ConnScheduler {
 
   private weBlockThem = ([_addr, data]: [string, {key?: string}]) => {
     if (!data?.key) return false;
-    return this.hops[data.key] === -1;
+    return this.socialGraph[data.key] === -1;
   };
 
   private weFollowThem = ([_addr, data]: [string, {key?: string}]) => {
     if (!data?.key) return false;
-    const h = this.hops[data.key];
-
-    // Only connect to feeds we follow unless `config.conn.hops` is set.
-    const maxHops = this.config.conn?.hops ?? 1;
-    return h > 0 && h <= maxHops;
+    return this.socialGraph[data.key] > 0;
   };
 
   private maxWaitToConnect(peer: Peer): number {
@@ -277,7 +269,7 @@ export class ConnScheduler {
       this.updateTheseConnections(p => p[1].source === 'seed', {
         quota: 3,
         backoffStep: 2e3,
-        backoffMax: 10 * minute,
+        backoffMax: 10 * MINUTES,
         groupMin: 1e3,
       });
     }
@@ -296,36 +288,36 @@ export class ConnScheduler {
     this.updateTheseConnections(p => p[1].type === 'room', {
       quota: 5,
       backoffStep: 5e3,
-      backoffMax: 5 * minute,
+      backoffMax: 5 * MINUTES,
       groupMin: 5e3,
     });
 
     this.updateTheseConnections(p => notRoom(p) && hasPinged(p), {
       quota: 2,
       backoffStep: 10e3,
-      backoffMax: 10 * minute,
+      backoffMax: 10 * MINUTES,
       groupMin: 5e3,
     });
 
     this.updateTheseConnections(p => notRoom(p) && hasNoAttempts(p), {
       quota: 2,
       backoffStep: 30e3,
-      backoffMax: 30 * minute,
+      backoffMax: 30 * MINUTES,
       groupMin: 15e3,
     });
 
     this.updateTheseConnections(p => notRoom(p) && hasOnlyFailedAttempts(p), {
       quota: 3,
-      backoffStep: 1 * minute,
-      backoffMax: 3 * hour,
-      groupMin: 5 * minute,
+      backoffStep: 1 * MINUTES,
+      backoffMax: 3 * HOUR,
+      groupMin: 5 * MINUTES,
     });
 
     this.updateTheseConnections(p => notRoom(p) && isLegacy(p), {
       quota: 1,
-      backoffStep: 4 * minute,
-      backoffMax: 3 * hour,
-      groupMin: 5 * minute,
+      backoffStep: 4 * MINUTES,
+      backoffMax: 3 * HOUR,
+      groupMin: 5 * MINUTES,
     });
 
     // Automatically connect to some (up to 3) staged peers we follow
@@ -357,14 +349,14 @@ export class ConnScheduler {
       .query()
       .peersConnected()
       .filter(p => p[1].type !== 'bt' && p[1].type !== 'lan')
-      .filter(p => p[1].stateChange! + 0.5 * hour < Date.now())
+      .filter(p => p[1].stateChange! + 0.5 * HOUR < Date.now())
       .forEach(([addr]) => conn.disconnect(addr));
   }
 
   private updateNow() {
     if (this.closed) return;
     if (this.isCurrentlyDownloading()) return;
-    if (this.isLoadingHops) return;
+    if (!this.loadedSocialGraph) return;
 
     this.updateStagingNow();
     this.updateHubNow();
@@ -400,20 +392,21 @@ export class ConnScheduler {
   private setupPubDiscovery() {
     if (this.config.conn?.populatePubs === false) return;
 
-    if (!this.hasSsbDb2) {
-      debug('Warning: ssb-db2 is missing, scheduling will miss some info');
+    if (!this.ssb.db?.operators) {
+      debug('Warning: ssb-db2 is missing, scheduling is degraded');
       return;
     }
 
     setTimeout(() => {
       if (this.closed) return;
+      if (!this.ssb.db?.operators) return;
       type PubContent = {address?: string};
       const MAX_STAGED_PUBS = 3;
       const {where, type, live, toPullStream} = this.ssb.db.operators;
       this.pubDiscoveryPausable = this.pubDiscoveryPausable ?? Pausable();
 
       pull(
-        this.ssb.db.query(
+        this.ssb.db!.query(
           where(type('pub')),
           live({old: true}),
           toPullStream(),
@@ -463,9 +456,7 @@ export class ConnScheduler {
 
   private setupBluetoothDiscovery() {
     if (!this.ssb.bluetooth?.nearbyScuttlebuttDevices) {
-      debug(
-        'Warning: ssb-bluetooth is missing, scheduling will miss some info',
-      );
+      debug('Warning: ssb-bluetooth is missing, scheduling is degraded');
       return;
     }
 
@@ -496,7 +487,7 @@ export class ConnScheduler {
 
   private setupLanDiscovery() {
     if (!this.ssb.lan?.start || !this.ssb.lan?.discoveredPeers) {
-      debug('Warning: ssb-lan is missing, scheduling will miss some info');
+      debug('Warning: ssb-lan is missing, scheduling is degraded');
       return;
     }
 
@@ -542,8 +533,14 @@ export class ConnScheduler {
       }
     }
 
+    this.ssbDB2Subscription = this.ssb.db?.post((msg: Msg) => {
+      if (msg.value.author !== this.ssb.id) {
+        this.lastMessageAt = Date.now();
+      }
+    });
+
     // Upon init, load some follow-and-blocks data
-    this.loadHops();
+    this.loadSocialGraph();
 
     // Upon init, populate with seeds
     this.populateWithSeeds();
@@ -584,7 +581,8 @@ export class ConnScheduler {
   @muxrpc('sync')
   public stop = () => {
     this.pubDiscoveryPausable?.pause();
-    this.ssb.lan?.stop?.();
+    this.ssb.lan?.stop();
+    this.ssbDB2Subscription?.();
     if (this.intervalForUpdate) {
       clearInterval(this.intervalForUpdate);
       this.intervalForUpdate = void 0;
