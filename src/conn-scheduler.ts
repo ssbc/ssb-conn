@@ -47,6 +47,10 @@ function notRoom(peer: Peer): boolean {
   return peer[1].type !== 'room';
 }
 
+function notPub(peer: Peer): boolean {
+  return peer[1].type !== 'pub';
+}
+
 function isDefunct(peer: Peer | [string, DBData]): boolean {
   return peer[1].defunct === true;
 }
@@ -320,11 +324,22 @@ export class ConnScheduler {
       groupMin: 5 * MINUTES,
     });
 
-    // Automatically connect to some (up to 3) staged peers we follow
-    z(conn.query().peersConnectable('staging').filter(this.weFollowThem))
+    // Automatically connect to some (up to 3) non-pub staged peers we follow
+    z(
+      conn
+        .query()
+        .peersConnectable('staging')
+        .filter(this.weFollowThem)
+        .filter(notPub),
+    )
       .z(
         take(
-          3 - conn.query().peersInConnection().filter(this.weFollowThem).length,
+          3 -
+            conn
+              .query()
+              .peersInConnection()
+              .filter(this.weFollowThem)
+              .filter(notPub).length,
         ),
       )
       .forEach(([addr, data]) => conn.connect(addr, data));
