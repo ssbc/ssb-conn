@@ -9,6 +9,11 @@
     "type": "git",
     "url": "git://github.com/staltz/ssb-conn.git"
   },
+  "files": [
+    "*.js",
+    "lib/**/*.js",
+    "lib/**/*.d.ts"
+  ],
   "dependencies": {
     "debug": "^4.3.1",
     "has-network2": ">=0.0.3",
