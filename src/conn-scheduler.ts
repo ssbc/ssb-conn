@@ -157,8 +157,8 @@ export class ConnScheduler {
           const prev = this.socialGraph;
           const updates = g[this.ssb.id];
           this.socialGraph = {...prev, ...updates};
-          this.loadedSocialGraph = true;
         }
+        this.loadedSocialGraph = true;
       }),
     );
   }
@@ -220,12 +220,12 @@ export class ConnScheduler {
 
     // Connect to suitable candidates
     z(peersDown)
-      .z(peers => peers.filter(p => !this.weBlockThem(p)))
-      .z(peers => peers.filter(canBeConnected))
-      .z(peers => peers.filter(([, data]) => data.autoconnect !== false))
+      .z((peers) => peers.filter((p) => !this.weBlockThem(p)))
+      .z((peers) => peers.filter(canBeConnected))
+      .z((peers) => peers.filter(([, data]) => data.autoconnect !== false))
       .z(passesGroupDebounce(groupMin))
-      .z(peers => peers.filter(passesExpBackoff(backoffStep, backoffMax)))
-      .z(peers =>
+      .z((peers) => peers.filter(passesExpBackoff(backoffStep, backoffMax)))
+      .z((peers) =>
         // with 30% chance, ignore 'bestness' and just choose randomly
         Math.random() <= 0.3 ? shufflePeers(peers) : sortByStateChange(peers),
       )
@@ -238,7 +238,7 @@ export class ConnScheduler {
     this.ssb.conn
       .query()
       .peersConnectable('db')
-      .filter(p => !this.weBlockThem(p))
+      .filter((p) => !this.weBlockThem(p))
       .filter(([, data]) => data.autoconnect === false)
       .forEach(([addr, data]) => this.ssb.conn.stage(addr, data));
 
@@ -270,7 +270,7 @@ export class ConnScheduler {
     const conn = this.ssb.conn;
 
     if (this.config.seed ?? true) {
-      this.updateTheseConnections(p => p[1].source === 'seed', {
+      this.updateTheseConnections((p) => p[1].source === 'seed', {
         quota: 3,
         backoffStep: 2e3,
         backoffMax: 10 * MINUTES,
@@ -289,35 +289,35 @@ export class ConnScheduler {
     }
 
     // Connect to rooms, up to 5 of them
-    this.updateTheseConnections(p => p[1].type === 'room', {
+    this.updateTheseConnections((p) => p[1].type === 'room', {
       quota: 5,
       backoffStep: 5e3,
       backoffMax: 5 * MINUTES,
       groupMin: 5e3,
     });
 
-    this.updateTheseConnections(p => notRoom(p) && hasPinged(p), {
+    this.updateTheseConnections((p) => notRoom(p) && hasPinged(p), {
       quota: 2,
       backoffStep: 10e3,
       backoffMax: 10 * MINUTES,
       groupMin: 5e3,
     });
 
-    this.updateTheseConnections(p => notRoom(p) && hasNoAttempts(p), {
+    this.updateTheseConnections((p) => notRoom(p) && hasNoAttempts(p), {
       quota: 2,
       backoffStep: 30e3,
       backoffMax: 30 * MINUTES,
       groupMin: 15e3,
     });
 
-    this.updateTheseConnections(p => notRoom(p) && hasOnlyFailedAttempts(p), {
+    this.updateTheseConnections((p) => notRoom(p) && hasOnlyFailedAttempts(p), {
       quota: 3,
       backoffStep: 1 * MINUTES,
       backoffMax: 3 * HOUR,
       groupMin: 5 * MINUTES,
     });
 
-    this.updateTheseConnections(p => notRoom(p) && isLegacy(p), {
+    this.updateTheseConnections((p) => notRoom(p) && isLegacy(p), {
       quota: 1,
       backoffStep: 4 * MINUTES,
       backoffMax: 3 * HOUR,
@@ -355,16 +355,16 @@ export class ConnScheduler {
     conn
       .query()
       .peersInConnection()
-      .filter(p => conn.hub().getState(p[0]) === 'connecting')
-      .filter(p => p[1].stateChange! + this.maxWaitToConnect(p) < Date.now())
+      .filter((p) => conn.hub().getState(p[0]) === 'connecting')
+      .filter((p) => p[1].stateChange! + this.maxWaitToConnect(p) < Date.now())
       .forEach(([addr]) => conn.disconnect(addr));
 
     // Purge an internet connection after it has been up for half an hour
     conn
       .query()
       .peersConnected()
-      .filter(p => p[1].type !== 'bt' && p[1].type !== 'lan')
-      .filter(p => p[1].stateChange! + 0.5 * HOUR < Date.now())
+      .filter((p) => p[1].type !== 'bt' && p[1].type !== 'lan')
+      .filter((p) => p[1].stateChange! + 0.5 * HOUR < Date.now())
       .forEach(([addr]) => conn.disconnect(addr));
   }
 
@@ -398,7 +398,7 @@ export class ConnScheduler {
   private populateWithSeeds() {
     // Populate connDB with configured seeds (mainly used in testing)
     const seeds = this.config.seeds ?? [];
-    (Array.isArray(seeds) ? seeds : [seeds]).filter(Boolean).forEach(addr => {
+    (Array.isArray(seeds) ? seeds : [seeds]).filter(Boolean).forEach((addr) => {
       const key = Ref.getKeyFromAddress(addr);
       this.ssb.conn.remember(addr, {key, source: 'seed'});
     });
