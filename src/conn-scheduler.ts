@@ -106,6 +106,10 @@ function shufflePeers(peers: Array<Peer>) {
   return peers.sort(() => Math.random() - 0.5);
 }
 
+function filter(condition: (peer: Peer) => boolean) {
+  return (arr: Array<Peer>) => arr.filter(condition);
+}
+
 const MINUTES = 60e3;
 const HOUR = 60 * 60e3;
 
@@ -220,11 +224,11 @@ export class ConnScheduler {
 
     // Connect to suitable candidates
     z(peersDown)
-      .z((peers) => peers.filter((p) => !this.weBlockThem(p)))
-      .z((peers) => peers.filter(canBeConnected))
-      .z((peers) => peers.filter(([, data]) => data.autoconnect !== false))
+      .z(filter((p) => !this.weBlockThem(p)))
+      .z(filter(canBeConnected))
+      .z(filter(([, data]) => data.autoconnect !== false))
       .z(passesGroupDebounce(groupMin))
-      .z((peers) => peers.filter(passesExpBackoff(backoffStep, backoffMax)))
+      .z(filter(passesExpBackoff(backoffStep, backoffMax)))
       .z((peers) =>
         // with 30% chance, ignore 'bestness' and just choose randomly
         Math.random() <= 0.3 ? shufflePeers(peers) : sortByStateChange(peers),
