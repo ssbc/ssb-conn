@@ -7,7 +7,6 @@ export type Peer = {
   host?: string;
   port?: number;
   source:
-    | 'seed'
     | 'pub'
     | 'manual'
     | 'friends'
@@ -34,18 +33,6 @@ export type Peer = {
 };
 
 export interface Config {
-  /**
-   * @deprecated
-   * Legacy from ssb-gossip that we probably want to delete soon.
-   */
-  seed?: boolean;
-
-  /**
-   * @deprecated
-   * Legacy from ssb-gossip that we probably want to delete soon.
-   */
-  seeds?: Array<string> | string;
-
   conn?: {
     /**
      * Whether the CONN scheduler should start automatically as soon as the

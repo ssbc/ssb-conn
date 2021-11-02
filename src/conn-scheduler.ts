@@ -269,15 +269,6 @@ export class ConnScheduler {
   private updateHubNow() {
     const conn = this.ssb.conn;
 
-    if (this.config.seed ?? true) {
-      this.updateTheseConnections((p) => p[1].source === 'seed', {
-        quota: 3,
-        backoffStep: 2e3,
-        backoffMax: 10 * MINUTES,
-        groupMin: 1e3,
-      });
-    }
-
     // If there are no peers, then try *any* connection ASAP
     if (conn.query().peersInConnection().length === 0) {
       this.updateTheseConnections(() => true, {
@@ -393,15 +384,6 @@ export class ConnScheduler {
 
   private removeDefunct(addr: string) {
     this.ssb.conn.db().update(addr, {defunct: void 0, autoconnect: void 0});
-  }
-
-  private populateWithSeeds() {
-    // Populate connDB with configured seeds (mainly used in testing)
-    const seeds = this.config.seeds ?? [];
-    (Array.isArray(seeds) ? seeds : [seeds]).filter(Boolean).forEach((addr) => {
-      const key = Ref.getKeyFromAddress(addr);
-      this.ssb.conn.remember(addr, {key, source: 'seed'});
-    });
   }
 
   private setupPubDiscovery() {
@@ -556,9 +538,6 @@ export class ConnScheduler {
 
     // Upon init, load some follow-and-blocks data
     this.loadSocialGraph();
-
-    // Upon init, populate with seeds
-    this.populateWithSeeds();
 
     // Upon init, setup discovery via various modes
     this.setupPubDiscovery();
