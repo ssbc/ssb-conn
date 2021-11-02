@@ -102,6 +102,23 @@ const {
   sortByStateChange,
 } = ConnQuery;
 
+/**
+ * Given an excess of connected peers, pick the ones that have been connected
+ * long enough. "Long enough" is 2minutes divided by the excess, so that the
+ * more excess we have, the quicker we trigger disconnections. The less excess,
+ * the longer we wait to trigger a disconnection.
+ */
+function filterOldExcess(excess: number) {
+  return (peers: Array<Peer>) =>
+    peers.filter((p) => Date.now() > p[1].hubUpdated! + (2 * MINUTES) / excess);
+}
+
+function sortByOldestConnection(peers: Array<Peer>) {
+  return peers.sort((a, b) => {
+    return a[1].hubUpdated! - b[1].hubUpdated!;
+  });
+}
+
 function shufflePeers(peers: Array<Peer>) {
   return peers.sort(() => Math.random() - 0.5);
 }
@@ -211,15 +228,11 @@ export class ConnScheduler {
 
     // Disconnect from excess, after some long and random delay
     z(peersUp)
-      .z(sortByStateChange)
+      .z(filterOldExcess(excess))
+      .z(sortByOldestConnection)
       .z(take(excess))
       .forEach(([addr]) => {
-        // Wait 2min, with +-50% randomization, but the more excess peers
-        // there are, the smaller wait we'll have
-        const fuzzyPeriod = (120e3 * (0.5 + Math.random())) / excess;
-        setTimeout(() => {
-          this.ssb.conn.disconnect(addr);
-        }, fuzzyPeriod);
+        this.ssb.conn.disconnect(addr);
       });
 
     // Connect to suitable candidates
