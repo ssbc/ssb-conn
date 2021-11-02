@@ -220,7 +220,7 @@ export class ConnScheduler {
   // opts: { quota, backoffStep, backoffMax, groupMin }
   private updateTheseConnections(test: (p: Peer) => boolean, opts: any) {
     const query = this.ssb.conn.query();
-    const peersUp = query.peersInConnection().filter(test);
+    const peersUp = query.peersConnected().filter(test);
     const peersDown = query.peersConnectable('db').filter(test);
     const {quota, backoffStep, backoffMax, groupMin} = opts;
     const excess = peersUp.length > quota * 2 ? peersUp.length - quota : 0;
