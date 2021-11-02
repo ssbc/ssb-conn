@@ -31,7 +31,10 @@ export function interpoolGlue(db: ConnDB, hub: ConnHub, staging: ConnStaging) {
     for (const [addr, data] of staging.entries()) {
       if (data.key && data.key === ev.key) staging.unstage(addr);
     }
-    db.update(address, {stateChange: Date.now()});
+    db.update(address, (prev) => ({
+      stateChange: Date.now(),
+      latestConnection: prev.latestConnection ?? 0,
+    }));
     const dbData = db.get(address);
     hub.update(address, {...dbData, ...stagedData});
   }
@@ -51,7 +54,11 @@ export function interpoolGlue(db: ConnDB, hub: ConnHub, staging: ConnStaging) {
     for (const [addr, data] of staging.entries()) {
       if (data.key && data.key === ev.key) staging.unstage(addr);
     }
-    db.update(address, {stateChange: Date.now(), failure: 0});
+    db.update(address, {
+      stateChange: Date.now(),
+      latestConnection: Date.now(),
+      failure: 0,
+    });
     const dbData = db.get(address);
     hub.update(address, {...dbData, ...stagedData});
     if (ev.details.isClient) setupPing(address, ev.details.rpc);

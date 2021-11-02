@@ -70,27 +70,3 @@ tape('automatically unstage upon connHub "connected" event', t => {
     t.end();
   });
 });
-
-tape('unstage only exactly what connHub "connected" event informed', t => {
-  t.plan(6);
-  const ssb = mock();
-
-  const address = TEST_ADDR;
-  const result1 = ssb.conn.stage(address, {mode: 'internet', address});
-  t.equals(result1, true, 'stage() succeeds');
-
-  const entries1 = Array.from(ssb.conn.staging().entries());
-  t.equals(entries1.length, 1, 'there is one address in staging');
-  const [actualAddress] = entries1[0];
-  t.equals(actualAddress, TEST_ADDR, 'staged address is what we expected');
-
-  ssb.conn.connect('net:unrelatedaddress.com:9009~noauth', (err, result) => {
-    t.error(err, 'no error');
-    t.ok(result, 'connect to unrelated random peer was succesful');
-
-    const entries2 = Array.from(ssb.conn.staging().entries());
-    t.equals(entries2.length, 1, 'there is (still) one address in staging');
-
-    t.end();
-  });
-});

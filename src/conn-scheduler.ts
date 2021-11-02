@@ -4,59 +4,40 @@ import {plugin, muxrpc} from 'secret-stack-decorators';
 import {AddressData as DBData} from 'ssb-conn-db/lib/types';
 import {ListenEvent as HubEvent} from 'ssb-conn-hub/lib/types';
 import {StagedData} from 'ssb-conn-staging/lib/types';
-import ConnQuery = require('ssb-conn-query');
-import {Peer} from 'ssb-conn-query/lib/types';
 import {Discovery as LANDiscovery} from 'ssb-lan/lib/types';
+import {Peer} from 'ssb-conn-query/lib/types';
+import ConnQuery = require('ssb-conn-query');
+const {hasNoAttempts, hasOnlyFailedAttempts} = ConnQuery;
 const pull = require('pull-stream');
 const Pausable = require('pull-pause');
 const ip = require('ip');
 const onWakeup = require('on-wakeup');
 const onNetwork = require('on-change-network-strict');
-const hasNetwork = require('has-network2');
+const hasNetworkRightNow = require('has-network2');
 const Ref = require('ssb-ref');
 const debug = require('debug')('ssb:conn:scheduler');
 import {Config, SSB} from './types';
 
+const SECONDS = 1e3;
+const MINUTES = 60e3;
+const HOUR = 60 * 60e3;
+
 let lastCheck = 0;
 let lastValue: any = null;
-function hasNetworkDebounced() {
+function hasNetwork() {
   if (lastCheck + 1e3 < Date.now()) {
     lastCheck = Date.now();
-    lastValue = hasNetwork();
+    lastValue = hasNetworkRightNow();
   }
   return lastValue;
 }
 
-//detect if not connected to wifi or other network
-//(i.e. if there is only localhost)
-function isOffline(p: Peer) {
-  if (ip.isLoopback(p[1].host) || p[1].host == 'localhost') return false;
-  else return !hasNetworkDebounced();
-}
-
-const canBeConnected = (p: Peer) => !isOffline(p);
-
-//peers which we can connect to, but are not upgraded.
-//select peers which we can connect to, but are not upgraded to LT.
-//assume any peer is legacy, until we know otherwise...
-function isLegacy(peer: Peer): boolean {
-  return hasSuccessfulAttempts(peer) && !hasPinged(peer);
-}
-
-function notRoom(peer: Peer): boolean {
-  return peer[1].type !== 'room';
-}
-
-function notPub(peer: Peer): boolean {
-  return peer[1].type !== 'pub';
-}
-
-function isDefunct(peer: Peer | [string, DBData]): boolean {
-  return peer[1].defunct === true;
-}
-
 function take(n: number) {
   return <T>(arr: Array<T>) => arr.slice(0, Math.max(n, 0));
+}
+
+function filter(condition: (peer: Peer) => boolean) {
+  return (arr: Array<Peer>) => arr.filter(condition);
 }
 
 type Type =
@@ -66,6 +47,7 @@ type Type =
   | 'dht'
   | 'pub'
   | 'room'
+  | 'room-attendant-alias'
   | 'room-attendant'
   | '?';
 
@@ -77,8 +59,10 @@ function detectType(peer: Peer): Type {
   if (data.type === 'dht') return 'dht';
   if (data.type === 'pub') return 'pub';
   if (data.type === 'room') return 'room';
-  if (data.type === 'room-endpoint') return 'room-attendant'; // legacy
-  if (data.type === 'room-attendant') return 'room-attendant';
+  if (data.type === 'room-endpoint' || data.type === 'room-attendant') {
+    if (data.alias) return 'room-attendant-alias';
+    else return 'room-attendant'; // legacy
+  }
   if (data.source === 'local') return 'lan';
   if (data.source === 'pub') return 'pub';
   if (data.source === 'internet') return 'internet';
@@ -92,15 +76,20 @@ function detectType(peer: Peer): Type {
   return '?';
 }
 
-const {
-  passesExpBackoff,
-  passesGroupDebounce,
-  hasNoAttempts,
-  hasOnlyFailedAttempts,
-  hasPinged,
-  hasSuccessfulAttempts,
-  sortByStateChange,
-} = ConnQuery;
+const isNotLocalhost = (p: Peer) =>
+  !ip.isLoopback(p[1].host) && p[1].host !== 'localhost';
+
+function isNotRoom(peer: Peer): boolean {
+  return peer[1].type !== 'room';
+}
+
+function isRoom(peer: Peer): boolean {
+  return peer[1].type === 'room';
+}
+
+function isDefunct(peer: Peer | [string, DBData]): boolean {
+  return peer[1].defunct === true;
+}
 
 /**
  * Given an excess of connected peers, pick the ones that have been connected
@@ -119,40 +108,87 @@ function sortByOldestConnection(peers: Array<Peer>) {
   });
 }
 
-function shufflePeers(peers: Array<Peer>) {
-  return peers.sort(() => Math.random() - 0.5);
+function calculateCooldown(
+  fullPercent: number,
+  hops: Record<FeedId, number | undefined>,
+) {
+  return (peers: Array<Peer>) => {
+    return peers.map((peer) => {
+      const [, data] = peer;
+      const peerType = detectType(peer);
+
+      // 10% is considered the smallest measurement of full
+      const normalizedFullPercent = Math.max(0.1, fullPercent);
+
+      // The larger the hop, the longer the cooldown. Handle special cases too
+      const hop = hops[data.key!];
+      const hopsCooldown =
+        peerType === 'room' // room is always considered at a constant distance
+          ? 1 * SECONDS
+          : hop === -1
+          ? Infinity
+          : hop === null || hop === void 0
+          ? 30 * SECONDS
+          : hop < 0
+          ? -hop * 5 * SECONDS
+          : hop * SECONDS;
+
+      // The more connection failures happened, the longer the cooldown is
+      const retryCooldown =
+        4 * SECONDS + Math.min(64, data.failure || 0) ** 3 * 10 * SECONDS;
+
+      // Sum the two together
+      let cooldown = (hopsCooldown + retryCooldown) * normalizedFullPercent;
+
+      // Make the cooldown shorter if the peer is new
+      if (hasNoAttempts(peer)) cooldown *= 0.5;
+      // Make the cooldown shorter randomly sometimes, to encourage exploration
+      if (Math.random() < 0.3) cooldown *= 0.5;
+      // Make the cooldown shorter for some special types of peers:
+      if (peerType === 'lan') cooldown *= 0.7;
+      if (peerType === 'room-attendant') cooldown *= 0.8;
+      // Make the cooldown longer if the peer has problems
+      if (hasOnlyFailedAttempts(peer)) cooldown *= 3;
+
+      data.cooldown = cooldown;
+      return peer;
+    });
+  };
 }
 
-function filter(condition: (peer: Peer) => boolean) {
-  return (arr: Array<Peer>) => arr.filter(condition);
+function cooledDownEnough(peer: Peer) {
+  const [, data] = peer;
+  const lastAttempt =
+    data.latestConnection ?? data.stateChange ?? data.hubUpdated ?? 0;
+  if (data.cooldown === undefined) return true;
+  return Date.now() > lastAttempt + data.cooldown;
 }
 
-const MINUTES = 60e3;
-const HOUR = 60 * 60e3;
-
-interface BTPeer {
-  remoteAddress: string;
-  id: string;
-  displayName: string;
-}
-
-interface Pausable {
-  pause: CallableFunction;
-  resume: CallableFunction;
+function sortByCooldownAscending(peers: Array<Peer>) {
+  return peers.sort((a, b) => {
+    const [, aData] = a;
+    const [, bData] = b;
+    if (aData.cooldown === undefined) return 1;
+    if (bData.cooldown === undefined) return -1;
+    return aData.cooldown! - bData.cooldown!;
+  });
 }
 
 @plugin('1.0.0')
 export class ConnScheduler {
   private readonly ssb: SSB;
   private readonly config: Config;
-  private pubDiscoveryPausable?: Pausable;
+  private pubDiscoveryPausable?: {
+    pause: CallableFunction;
+    resume: CallableFunction;
+  };
   private intervalForUpdate?: NodeJS.Timeout;
   private ssbDB2Subscription?: CallableFunction | undefined;
   private closed: boolean;
-  private loadedSocialGraph: boolean;
+  private loadedHops: boolean;
   private lastMessageAt: number;
   private hasScheduledAnUpdate: boolean;
-  private socialGraph: Record<FeedId, number>;
+  private hops: Record<FeedId, number>;
 
   constructor(ssb: any, config: any) {
     this.ssb = ssb;
@@ -160,26 +196,22 @@ export class ConnScheduler {
     this.closed = true;
     this.lastMessageAt = 0;
     this.hasScheduledAnUpdate = false;
-    this.loadedSocialGraph = false;
-    this.socialGraph = {};
+    this.loadedHops = false;
+    this.hops = {};
   }
 
   private loadSocialGraph() {
-    if (!this.ssb.friends?.graphStream) {
+    if (!this.ssb.friends?.hopStream) {
       debug('Warning: ssb-friends@5 is missing, scheduling is degraded');
-      this.loadedSocialGraph = true;
+      this.loadedHops = true;
       return;
     }
 
     pull(
-      this.ssb.friends?.graphStream({live: true, old: true}),
-      pull.drain((g: Record<FeedId, Record<FeedId, number>>) => {
-        if (g[this.ssb.id]) {
-          const prev = this.socialGraph;
-          const updates = g[this.ssb.id];
-          this.socialGraph = {...prev, ...updates};
-        }
-        this.loadedSocialGraph = true;
+      this.ssb.friends?.hopStream({live: true, old: true}),
+      pull.drain((h: Record<FeedId, number>) => {
+        this.hops = {...this.hops, ...h};
+        this.loadedHops = true;
       }),
     );
   }
@@ -189,20 +221,23 @@ export class ConnScheduler {
     return this.lastMessageAt && this.lastMessageAt > Date.now() - 500;
   }
 
-  private weBlockThem = ([_addr, data]: [string, {key?: string}]) => {
+  private isBlocked = (peer: [Peer[0], Pick<Peer[1], 'key'>]) => {
+    const [, data] = peer;
     if (!data?.key) return false;
-    return this.socialGraph[data.key] === -1;
+    return this.hops[data.key] === -1;
   };
 
-  private weFollowThem = ([_addr, data]: [string, {key?: string}]) => {
-    if (!data?.key) return false;
-    return this.socialGraph[data.key] > 0;
+  private isNotBlocked = (peer: [Peer[0], Pick<Peer[1], 'key'>]) => {
+    return !this.isBlocked(peer);
   };
 
   private maxWaitToConnect(peer: Peer): number {
     const type = detectType(peer);
     switch (type) {
       case 'lan':
+        return 30e3;
+
+      case 'room-attendant-alias':
         return 30e3;
 
       case 'bt':
@@ -217,14 +252,17 @@ export class ConnScheduler {
   }
 
   // Utility to connect to bunch of peers, or disconnect if over quota
-  // opts: { quota, backoffStep, backoffMax, groupMin }
-  private updateTheseConnections(test: (p: Peer) => boolean, opts: any) {
+  private updateTheseConnections(
+    pool: Parameters<ConnQuery['peersConnectable']>[0],
+    test: (p: Peer) => boolean,
+    quota: number,
+  ) {
     const query = this.ssb.conn.query();
     const peersUp = query.peersConnected().filter(test);
-    const peersDown = query.peersConnectable('db').filter(test);
-    const {quota, backoffStep, backoffMax, groupMin} = opts;
+    const peersDown = query.peersConnectable(pool).filter(test);
     const excess = peersUp.length > quota * 2 ? peersUp.length - quota : 0;
     const freeSlots = Math.max(quota - peersUp.length, 0);
+    const fullPercent = 1 - freeSlots / quota;
 
     // Disconnect from excess, after some long and random delay
     z(peersUp)
@@ -237,15 +275,12 @@ export class ConnScheduler {
 
     // Connect to suitable candidates
     z(peersDown)
-      .z(filter((p) => !this.weBlockThem(p)))
-      .z(filter(canBeConnected))
+      .z(filter(this.isNotBlocked))
+      .z(filter(isNotLocalhost))
       .z(filter(([, data]) => data.autoconnect !== false))
-      .z(passesGroupDebounce(groupMin))
-      .z(filter(passesExpBackoff(backoffStep, backoffMax)))
-      .z((peers) =>
-        // with 30% chance, ignore 'bestness' and just choose randomly
-        Math.random() <= 0.3 ? shufflePeers(peers) : sortByStateChange(peers),
-      )
+      .z(calculateCooldown(fullPercent, this.hops))
+      .z(filter(cooledDownEnough))
+      .z(sortByCooldownAscending)
       .z(take(freeSlots))
       .forEach(([addr, data]) => this.ssb.conn.connect(addr, data));
   }
@@ -255,7 +290,7 @@ export class ConnScheduler {
     this.ssb.conn
       .query()
       .peersConnectable('db')
-      .filter((p) => !this.weBlockThem(p))
+      .filter(this.isNotBlocked)
       .filter(([, data]) => data.autoconnect === false)
       .forEach(([addr, data]) => this.ssb.conn.stage(addr, data));
 
@@ -263,7 +298,7 @@ export class ConnScheduler {
     this.ssb.conn
       .query()
       .peersConnectable('staging')
-      .filter(this.weBlockThem)
+      .filter(this.isBlocked)
       .forEach(([addr]) => this.ssb.conn.unstage(addr));
 
     // Purge some old staged LAN peers
@@ -286,77 +321,15 @@ export class ConnScheduler {
   private updateHubNow() {
     const conn = this.ssb.conn;
 
-    // If there are no peers, then try *any* connection ASAP
-    if (conn.query().peersInConnection().length === 0) {
-      this.updateTheseConnections(() => true, {
-        quota: 1,
-        backoffStep: 1e3,
-        backoffMax: 6e3,
-        groupMin: 0,
-      });
-    }
+    this.updateTheseConnections('db', isRoom, 5);
 
-    // Connect to rooms, up to 5 of them
-    this.updateTheseConnections((p) => p[1].type === 'room', {
-      quota: 5,
-      backoffStep: 5e3,
-      backoffMax: 5 * MINUTES,
-      groupMin: 5e3,
-    });
-
-    this.updateTheseConnections((p) => notRoom(p) && hasPinged(p), {
-      quota: 2,
-      backoffStep: 10e3,
-      backoffMax: 10 * MINUTES,
-      groupMin: 5e3,
-    });
-
-    this.updateTheseConnections((p) => notRoom(p) && hasNoAttempts(p), {
-      quota: 2,
-      backoffStep: 30e3,
-      backoffMax: 30 * MINUTES,
-      groupMin: 15e3,
-    });
-
-    this.updateTheseConnections((p) => notRoom(p) && hasOnlyFailedAttempts(p), {
-      quota: 3,
-      backoffStep: 1 * MINUTES,
-      backoffMax: 3 * HOUR,
-      groupMin: 5 * MINUTES,
-    });
-
-    this.updateTheseConnections((p) => notRoom(p) && isLegacy(p), {
-      quota: 1,
-      backoffStep: 4 * MINUTES,
-      backoffMax: 3 * HOUR,
-      groupMin: 5 * MINUTES,
-    });
-
-    // Automatically connect to some (up to 3) non-pub staged peers we follow
-    z(
-      conn
-        .query()
-        .peersConnectable('staging')
-        .filter(this.weFollowThem)
-        .filter(notPub),
-    )
-      .z(
-        take(
-          3 -
-            conn
-              .query()
-              .peersInConnection()
-              .filter(this.weFollowThem)
-              .filter(notPub).length,
-        ),
-      )
-      .forEach(([addr, data]) => conn.connect(addr, data));
+    this.updateTheseConnections('dbAndStaging', isNotRoom, 4);
 
     // Purge connected peers that are now blocked
     conn
       .query()
       .peersInConnection()
-      .filter(this.weBlockThem)
+      .filter(this.isBlocked)
       .forEach(([addr]) => conn.disconnect(addr));
 
     // Purge some ongoing frustrating connection attempts
@@ -367,19 +340,42 @@ export class ConnScheduler {
       .filter((p) => p[1].stateChange! + this.maxWaitToConnect(p) < Date.now())
       .forEach(([addr]) => conn.disconnect(addr));
 
-    // Purge an internet connection after it has been up for half an hour
-    conn
-      .query()
-      .peersConnected()
-      .filter((p) => p[1].type !== 'bt' && p[1].type !== 'lan')
-      .filter((p) => p[1].stateChange! + 0.5 * HOUR < Date.now())
-      .forEach(([addr]) => conn.disconnect(addr));
+    // Purge empty rooms if there are other rooms to try.
+    // The more there are other rooms to try, the shorter the grace period.
+    const otherRooms = conn.query().peersConnectable('db').filter(isRoom);
+    if (otherRooms.length > 0) {
+      const GRACE_PERIOD = (1.5 * MINUTES) / otherRooms.length;
+      conn
+        .query()
+        .peersConnected()
+        .filter(isRoom)
+        .filter(
+          ([, data]) =>
+            data.onlineCount === 0 &&
+            data.hubUpdated! + GRACE_PERIOD < Date.now(),
+        )
+        .forEach(([addr]) => conn.disconnect(addr));
+    }
+
+    // Purge non-room connections to create rotation for others.
+    // The more staged peers there are available, the shorter the grace period.
+    const staged = conn.query().peersConnectable('staging');
+    if (staged.length > 0) {
+      const GRACE_PERIOD = (3 * HOUR) / staged.length;
+      conn
+        .query()
+        .peersConnected()
+        .filter(isNotRoom)
+        .filter((p) => p[1].stateChange! + GRACE_PERIOD < Date.now())
+        .forEach(([addr]) => conn.disconnect(addr));
+    }
   }
 
   private updateNow() {
     if (this.closed) return;
     if (this.isCurrentlyDownloading()) return;
-    if (!this.loadedSocialGraph) return;
+    if (!this.loadedHops) return;
+    if (!hasNetwork()) return;
 
     this.updateStagingNow();
     this.updateHubNow();
@@ -435,7 +431,7 @@ export class ConnScheduler {
           try {
             const address = Ref.toMultiServerAddress(msg.value.content.address);
             const key = Ref.getKeyFromAddress(address);
-            if (this.weBlockThem([address, {key}])) {
+            if (this.isBlocked([address, {key}])) {
               this.ssb.conn.forget(address);
             } else if (!this.ssb.conn.db().has(address)) {
               this.ssb.conn.stage(address, {key, type: 'pub'});
@@ -474,6 +470,12 @@ export class ConnScheduler {
       return;
     }
 
+    interface BTPeer {
+      remoteAddress: string;
+      id: string;
+      displayName: string;
+    }
+
     pull(
       this.ssb.bluetooth.nearbyScuttlebuttDevices(1000),
       pull.drain(({discovered}: {discovered: Array<BTPeer>}) => {
@@ -489,10 +491,9 @@ export class ConnScheduler {
             note: btPeer.displayName,
             key: btPeer.id,
           };
-          if (this.weFollowThem([address, data])) {
-            this.ssb.conn.connect(address, data);
-          } else {
+          if (this.isNotBlocked([address, data])) {
             this.ssb.conn.stage(address, data);
+            this.updateSoon(100);
           }
         }
       }),
@@ -515,10 +516,9 @@ export class ConnScheduler {
           key,
           verified,
         };
-        if (this.weFollowThem([address, data])) {
-          this.ssb.conn.connect(address, data);
-        } else {
+        if (this.isNotBlocked([address, data])) {
           this.ssb.conn.stage(address, data);
+          this.updateSoon(100);
         }
       }),
     );
@@ -526,14 +526,11 @@ export class ConnScheduler {
     this.ssb.lan.start();
   }
 
-  @muxrpc('sync')
-  public start = () => {
-    if (!this.closed) return;
-    this.closed = false;
+  private cleanUpDB() {
+    const roomsWithMembership = new Set();
 
-    // Upon init, purge some undesired DB entries
     for (let peer of this.ssb.conn.dbPeers()) {
-      const [address, {source, type}] = peer;
+      const [address, {source, type, membership}] = peer;
       if (
         source === 'local' ||
         source === 'bt' ||
@@ -545,7 +542,32 @@ export class ConnScheduler {
       if (isDefunct(peer)) {
         this.removeDefunct(address);
       }
+      if (type === 'room' && membership) {
+        roomsWithMembership.add(address);
+      }
     }
+
+    // Remove "room attendant aliases" that are in rooms where I'm a member
+    for (let [address, data] of this.ssb.conn.dbPeers()) {
+      if (data.type === 'room-endpoint' || data.type === 'room-attendant') {
+        if (
+          data.alias &&
+          data.roomAddress &&
+          roomsWithMembership.has(data.roomAddress)
+        ) {
+          this.ssb.conn.forget(address);
+        }
+      }
+    }
+  }
+
+  @muxrpc('sync')
+  public start = () => {
+    if (!this.closed) return;
+    this.closed = false;
+
+    // Upon init, purge some undesired DB entries
+    this.cleanUpDB();
 
     this.ssbDB2Subscription = this.ssb.db?.post((msg: Msg) => {
       if (msg.value.author !== this.ssb.id) {
@@ -553,7 +575,7 @@ export class ConnScheduler {
       }
     });
 
-    // Upon init, load some follow-and-blocks data
+    // Upon init, load some follow and block data
     this.loadSocialGraph();
 
     // Upon init, setup discovery via various modes
