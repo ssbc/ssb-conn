@@ -545,7 +545,6 @@ export class ConnScheduler {
 
     // Upon init, setup discovery via various modes
     this.setupPubDiscovery();
-    this.pubDiscoveryPausable?.resume();
     this.setupLanDiscovery();
     this.setupBluetoothDiscovery();
 
