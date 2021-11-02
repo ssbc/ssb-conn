@@ -572,7 +572,7 @@ export class ConnScheduler {
     );
 
     // Upon init, attempt to make some connections
-    this.updateSoon();
+    this.updateNow();
   };
 
   @muxrpc('sync')
