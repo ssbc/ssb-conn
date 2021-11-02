@@ -407,7 +407,7 @@ export class ConnScheduler {
       return;
     }
 
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       if (this.closed) return;
       if (!this.ssb.db?.operators) return;
       type PubContent = {address?: string};
@@ -462,6 +462,7 @@ export class ConnScheduler {
         }),
       );
     }, 1000);
+    timer?.unref?.();
   }
 
   private setupBluetoothDiscovery() {
@@ -585,7 +586,7 @@ export class ConnScheduler {
 
     // Upon regular time intervals, attempt to make connections
     this.intervalForUpdate = setInterval(() => this.updateSoon(), 2e3);
-    if (this.intervalForUpdate?.unref) this.intervalForUpdate.unref();
+    this.intervalForUpdate?.unref?.();
 
     // Upon wakeup, trigger hard reconnect
     onWakeup(() => {
