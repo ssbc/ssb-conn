@@ -158,8 +158,7 @@ function calculateCooldown(
 
 function cooledDownEnough(peer: Peer) {
   const [, data] = peer;
-  const lastAttempt =
-    data.latestConnection ?? data.stateChange ?? data.hubUpdated ?? 0;
+  const lastAttempt = data.stateChange ?? data.hubUpdated ?? 0;
   if (data.cooldown === undefined) return true;
   return Date.now() > lastAttempt + data.cooldown;
 }
