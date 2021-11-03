@@ -468,6 +468,40 @@ export class ConnScheduler {
     timer?.unref?.();
   }
 
+  private setupRoomAttendantDiscovery() {
+    const timer = setTimeout(() => {
+      if (!this.ssb.roomClient?.discoveredAttendants) {
+        debug('Warning: ssb-room-client@2 is missing, scheduling is degraded');
+        return;
+      }
+
+      interface Attendant {
+        key: FeedId;
+        address: string;
+        room: FeedId;
+        roomName?: string;
+      }
+      
+      pull(
+        this.ssb.roomClient.discoveredAttendants(),
+        pull.drain((attendant: Attendant) => {
+          const addr = attendant.address;
+          const data: Partial<StagedData> = {
+            type: 'room-attendant',
+            key: attendant.key,
+            room: attendant.room,
+            roomName: attendant.roomName,
+          };
+          if (this.isNotBlocked([addr, data]) && this.isNotConnected(addr)) {
+            this.ssb.conn.stage(addr, data);
+            this.updateSoon(100);
+          }
+        }),
+      );
+    }, 100);
+    timer?.unref?.();
+  }
+
   private setupBluetoothDiscovery() {
     if (!this.ssb.bluetooth?.nearbyScuttlebuttDevices) {
       debug('Warning: ssb-bluetooth is missing, scheduling is degraded');
@@ -587,6 +621,7 @@ export class ConnScheduler {
 
     // Upon init, setup discovery via various modes
     this.setupPubDiscovery();
+    this.setupRoomAttendantDiscovery();
     this.setupLanDiscovery();
     this.setupBluetoothDiscovery();
 

@@ -17,7 +17,6 @@ export type Peer = {
   error?: string;
   state?: undefined | 'connecting' | 'connected' | 'disconnecting';
   stateChange?: number;
-  latestConnection?: number;
   failure?: number;
   client?: boolean;
   duration?: {
@@ -54,6 +53,9 @@ export interface SSB {
   readonly friends?: Readonly<{
     graphStream: (opts: {old: boolean; live: boolean}) => CallableFunction;
     hopStream: (opts: {old: boolean; live: boolean}) => CallableFunction;
+  }>;
+  readonly roomClient?: Readonly<{
+    discoveredAttendants: () => CallableFunction;
   }>;
   readonly bluetooth?: Readonly<{
     nearbyScuttlebuttDevices: (x: number) => CallableFunction;
