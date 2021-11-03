@@ -230,6 +230,10 @@ export class ConnScheduler {
     return !this.isBlocked(peer);
   };
 
+  private isNotConnected = (address: string) => {
+    return !this.ssb.conn.hub().getState(address);
+  };
+
   private maxWaitToConnect(peer: Peer): number {
     const type = detectType(peer);
     switch (type) {
@@ -482,7 +486,7 @@ export class ConnScheduler {
         if (this.closed) return;
 
         for (const btPeer of discovered) {
-          const address =
+          const addr =
             `bt:${btPeer.remoteAddress.split(':').join('')}` +
             '~' +
             `shs:${btPeer.id.replace(/^\@/, '').replace(/\.ed25519$/, '')}`;
@@ -491,8 +495,8 @@ export class ConnScheduler {
             note: btPeer.displayName,
             key: btPeer.id,
           };
-          if (this.isNotBlocked([address, data])) {
-            this.ssb.conn.stage(address, data);
+          if (this.isNotBlocked([addr, data]) && this.isNotConnected(addr)) {
+            this.ssb.conn.stage(addr, data);
             this.updateSoon(100);
           }
         }
@@ -516,7 +520,10 @@ export class ConnScheduler {
           key,
           verified,
         };
-        if (this.isNotBlocked([address, data])) {
+        if (
+          this.isNotBlocked([address, data]) &&
+          this.isNotConnected(address)
+        ) {
           this.ssb.conn.stage(address, data);
           this.updateSoon(100);
         }
