@@ -426,6 +426,105 @@ export class ConnScheduler {
     this.ssb.conn.db().update(addr, {defunct: void 0, autoconnect: void 0});
   }
 
+  private setupBluetoothDiscovery() {
+    if (!this.ssb.bluetooth?.nearbyScuttlebuttDevices) {
+      debug('Warning: ssb-bluetooth is missing, scheduling is degraded');
+      return;
+    }
+
+    interface BTPeer {
+      remoteAddress: string;
+      id: string;
+      displayName: string;
+    }
+
+    pull(
+      this.ssb.bluetooth.nearbyScuttlebuttDevices(1000),
+      pull.drain(({discovered}: {discovered: Array<BTPeer>}) => {
+        if (this.closed) return;
+
+        for (const btPeer of discovered) {
+          const addr =
+            `bt:${btPeer.remoteAddress.split(':').join('')}` +
+            '~' +
+            `shs:${btPeer.id.replace(/^\@/, '').replace(/\.ed25519$/, '')}`;
+          const data: Partial<StagedData> = {
+            type: 'bt',
+            note: btPeer.displayName,
+            key: btPeer.id,
+          };
+          if (this.isNotBlocked([addr, data]) && this.isNotConnected(addr)) {
+            this.ssb.conn.stage(addr, data);
+            this.updateSoon(100);
+          }
+        }
+      }),
+    );
+  }
+
+  private setupLanDiscovery() {
+    if (!this.ssb.lan?.start || !this.ssb.lan?.discoveredPeers) {
+      debug('Warning: ssb-lan is missing, scheduling is degraded');
+      return;
+    }
+
+    pull(
+      this.ssb.lan.discoveredPeers(),
+      pull.drain(({address, verified}: LANDiscovery) => {
+        const key: FeedId | undefined = Ref.getKeyFromAddress(address);
+        if (!key) return;
+        const data: Partial<StagedData> = {
+          type: 'lan',
+          key,
+          verified,
+        };
+        if (
+          this.isNotBlocked([address, data]) &&
+          this.isNotConnected(address)
+        ) {
+          this.ssb.conn.stage(address, data);
+          this.updateSoon(100);
+        }
+      }),
+    );
+
+    this.ssb.lan.start();
+  }
+
+  private setupRoomAttendantDiscovery() {
+    const timer = setTimeout(() => {
+      if (!this.ssb.roomClient?.discoveredAttendants) {
+        debug('Warning: ssb-room-client@2 is missing, scheduling is degraded');
+        return;
+      }
+
+      interface Attendant {
+        key: FeedId;
+        address: string;
+        room: FeedId;
+        roomName?: string;
+      }
+
+      pull(
+        this.ssb.roomClient.discoveredAttendants(),
+        pull.drain((attendant: Attendant) => {
+          const addr = attendant.address;
+          const data: Partial<StagedData> = {
+            type: 'room-attendant',
+            key: attendant.key,
+            room: attendant.room,
+            roomName: attendant.roomName,
+          };
+          if (this.isNotBlocked([addr, data]) && this.isNotConnected(addr)) {
+            this.ssb.conn.stage(addr, data);
+            this.updateSoon(100);
+          }
+        }),
+      );
+    }, 100);
+    timer?.unref?.();
+  }
+
   private setupPubDiscovery() {
     if (this.config.conn?.populatePubs === false) return;
 
@@ -492,105 +591,6 @@ export class ConnScheduler {
     timer?.unref?.();
   }
 
-  private setupRoomAttendantDiscovery() {
-    const timer = setTimeout(() => {
-      if (!this.ssb.roomClient?.discoveredAttendants) {
-        debug('Warning: ssb-room-client@2 is missing, scheduling is degraded');
-        return;
-      }
-
-      interface Attendant {
-        key: FeedId;
-        address: string;
-        room: FeedId;
-        roomName?: string;
-      }
-      
-      pull(
-        this.ssb.roomClient.discoveredAttendants(),
-        pull.drain((attendant: Attendant) => {
-          const addr = attendant.address;
-          const data: Partial<StagedData> = {
-            type: 'room-attendant',
-            key: attendant.key,
-            room: attendant.room,
-            roomName: attendant.roomName,
-          };
-          if (this.isNotBlocked([addr, data]) && this.isNotConnected(addr)) {
-            this.ssb.conn.stage(addr, data);
-            this.updateSoon(100);
-          }
-        }),
-      );
-    }, 100);
-    timer?.unref?.();
-  }
-
-  private setupBluetoothDiscovery() {
-    if (!this.ssb.bluetooth?.nearbyScuttlebuttDevices) {
-      debug('Warning: ssb-bluetooth is missing, scheduling is degraded');
-      return;
-    }
-
-    interface BTPeer {
-      remoteAddress: string;
-      id: string;
-      displayName: string;
-    }
-
-    pull(
-      this.ssb.bluetooth.nearbyScuttlebuttDevices(1000),
-      pull.drain(({discovered}: {discovered: Array<BTPeer>}) => {
-        if (this.closed) return;
-
-        for (const btPeer of discovered) {
-          const addr =
-            `bt:${btPeer.remoteAddress.split(':').join('')}` +
-            '~' +
-            `shs:${btPeer.id.replace(/^\@/, '').replace(/\.ed25519$/, '')}`;
-          const data: Partial<StagedData> = {
-            type: 'bt',
-            note: btPeer.displayName,
-            key: btPeer.id,
-          };
-          if (this.isNotBlocked([addr, data]) && this.isNotConnected(addr)) {
-            this.ssb.conn.stage(addr, data);
-            this.updateSoon(100);
-          }
-        }
-      }),
-    );
-  }
-
-  private setupLanDiscovery() {
-    if (!this.ssb.lan?.start || !this.ssb.lan?.discoveredPeers) {
-      debug('Warning: ssb-lan is missing, scheduling is degraded');
-      return;
-    }
-
-    pull(
-      this.ssb.lan.discoveredPeers(),
-      pull.drain(({address, verified}: LANDiscovery) => {
-        const key: FeedId | undefined = Ref.getKeyFromAddress(address);
-        if (!key) return;
-        const data: Partial<StagedData> = {
-          type: 'lan',
-          key,
-          verified,
-        };
-        if (
-          this.isNotBlocked([address, data]) &&
-          this.isNotConnected(address)
-        ) {
-          this.ssb.conn.stage(address, data);
-          this.updateSoon(100);
-        }
-      }),
-    );
-
-    this.ssb.lan.start();
-  }
-
   private cleanUpDB() {
     const roomsWithMembership = new Set();
 
@@ -644,10 +644,10 @@ export class ConnScheduler {
     this.loadSocialGraph();
 
     // Upon init, setup discovery via various modes
-    this.setupPubDiscovery();
-    this.setupRoomAttendantDiscovery();
-    this.setupLanDiscovery();
     this.setupBluetoothDiscovery();
+    this.setupLanDiscovery();
+    this.setupRoomAttendantDiscovery();
+    this.setupPubDiscovery();
 
     // Upon regular time intervals, attempt to make connections
     this.intervalForUpdate = setInterval(() => this.updateSoon(), 2e3);
@@ -655,14 +655,12 @@ export class ConnScheduler {
 
     // Upon wakeup, trigger hard reconnect
     onWakeup(() => {
-      if (this.closed) return;
-      this.ssb.conn.hub().reset();
+      if (!this.closed) this.ssb.conn.hub().reset();
     });
 
     // Upon network changes, trigger hard reconnect
     onNetwork(() => {
-      if (this.closed) return;
-      this.ssb.conn.hub().reset();
+      if (!this.closed) this.ssb.conn.hub().reset();
     });
 
     // Upon some disconnection, attempt to make connections
