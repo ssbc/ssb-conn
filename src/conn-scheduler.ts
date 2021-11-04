@@ -22,6 +22,13 @@ const SECONDS = 1e3;
 const MINUTES = 60e3;
 const HOUR = 60 * 60e3;
 
+/**
+ * A random number between 0.8 and 1.2 to add some randomization, but a fixed
+ * number for the current runtime. This is just to make sure that other peers
+ * don't have the exact same wait periods as us, so to avoid deadlocks.
+ */
+const RANDOM_MULTIPLIER = 0.8 + Math.random() * 0.4;
+
 let lastCheck = 0;
 let lastValue: any = null;
 function hasNetwork() {
@@ -98,8 +105,12 @@ function isDefunct(peer: Peer | [string, DBData]): boolean {
  * the longer we wait to trigger a disconnection.
  */
 function filterOldExcess(excess: number) {
-  return (peers: Array<Peer>) =>
-    peers.filter((p) => Date.now() > p[1].hubUpdated! + (2 * MINUTES) / excess);
+  return (peers: Array<Peer>) => {
+    const WAIT_TIME = 2 * MINUTES * RANDOM_MULTIPLIER;
+    return peers.filter(
+      (p) => Date.now() > p[1].hubUpdated! + WAIT_TIME / excess,
+    );
+  };
 }
 
 function sortByOldestConnection(peers: Array<Peer>) {
@@ -186,6 +197,7 @@ export class ConnScheduler {
   private closed: boolean;
   private loadedHops: boolean;
   private lastMessageAt: number;
+  private lastRotationAt: number;
   private hasScheduledAnUpdate: boolean;
   private hops: Record<FeedId, number>;
 
@@ -194,6 +206,7 @@ export class ConnScheduler {
     this.config = config;
     this.closed = true;
     this.lastMessageAt = 0;
+    this.lastRotationAt = 0;
     this.hasScheduledAnUpdate = false;
     this.loadedHops = false;
     this.hops = {};
@@ -255,14 +268,21 @@ export class ConnScheduler {
   }
 
   // Utility to connect to bunch of peers, or disconnect if over quota
-  private updateTheseConnections(
-    pool: Parameters<ConnQuery['peersConnectable']>[0],
-    test: (p: Peer) => boolean,
+  private maintainConnections(
     quota: number,
+    isDesiredPeer: (p: Peer) => boolean,
+    pool: Parameters<ConnQuery['peersConnectable']>[0],
+    isPeerRotatable: null | ((p: Peer) => boolean),
+    rotationPeriod: number,
   ) {
     const query = this.ssb.conn.query();
-    const peersUp = query.peersConnected().filter(test);
-    const peersDown = query.peersConnectable(pool).filter(test);
+    const peersUp = query.peersConnected().filter(isDesiredPeer);
+    const peersDown = query
+      .peersConnectable(pool)
+      .filter(isDesiredPeer)
+      .filter(this.isNotBlocked)
+      .filter(isNotLocalhost)
+      .filter(([, data]) => data.autoconnect !== false);
     const excess = peersUp.length > quota * 2 ? peersUp.length - quota : 0;
     const freeSlots = Math.max(quota - peersUp.length, 0);
     const fullPercent = 1 - freeSlots / quota;
@@ -272,15 +292,35 @@ export class ConnScheduler {
       .z(filterOldExcess(excess))
       .z(sortByOldestConnection)
       .z(take(excess))
-      .forEach(([addr]) => {
-        this.ssb.conn.disconnect(addr);
-      });
+      .forEach(([addr]) => this.ssb.conn.disconnect(addr));
+
+    // Disconnect from 1 peer that needs to rotate out to give others a chance.
+    // The more there are other peers available, the shorter the grace period.
+    const ROTATION_PERIOD =
+      (rotationPeriod * RANDOM_MULTIPLIER) / Math.sqrt(peersDown.length);
+    if (
+      freeSlots === 0 &&
+      peersDown.length > 0 &&
+      this.lastRotationAt + ROTATION_PERIOD < Date.now()
+    ) {
+      z(peersUp)
+        .z(filter(isPeerRotatable ?? (() => true)))
+        .z(
+          filter(([, data]) => {
+            const lastAttempt = data.stateChange ?? data.hubUpdated ?? 0;
+            return lastAttempt + ROTATION_PERIOD < Date.now();
+          }),
+        )
+        .z(sortByOldestConnection)
+        .z(take(1))
+        .forEach(([addr]) => {
+          this.lastRotationAt = Date.now();
+          this.ssb.conn.disconnect(addr);
+        });
+    }
 
     // Connect to suitable candidates
     z(peersDown)
-      .z(filter(this.isNotBlocked))
-      .z(filter(isNotLocalhost))
-      .z(filter(([, data]) => data.autoconnect !== false))
       .z(calculateCooldown(fullPercent, this.hops))
       .z(filter(cooledDownEnough))
       .z(sortByCooldownAscending)
@@ -322,56 +362,40 @@ export class ConnScheduler {
   }
 
   private updateHubNow() {
-    const conn = this.ssb.conn;
+    // Try to maintain connections with 5 rooms
+    this.maintainConnections(
+      5,
+      isRoom,
+      'db',
+      // When a room is empty, start rotating to other rooms with 2min period
+      (p) => p[1].onlineCount === 0,
+      2 * MINUTES,
+    );
 
-    this.updateTheseConnections('db', isRoom, 5);
-
-    this.updateTheseConnections('dbAndStaging', isNotRoom, 4);
+    // Try to maintain connections with 4 non-rooms
+    this.maintainConnections(
+      4,
+      isNotRoom,
+      'dbAndStaging',
+      // 2 hour nominal rotation period
+      null,
+      2 * HOUR,
+    );
 
     // Purge connected peers that are now blocked
-    conn
+    this.ssb.conn
       .query()
       .peersInConnection()
       .filter(this.isBlocked)
-      .forEach(([addr]) => conn.disconnect(addr));
+      .forEach(([addr]) => this.ssb.conn.disconnect(addr));
 
     // Purge some ongoing frustrating connection attempts
-    conn
+    this.ssb.conn
       .query()
       .peersInConnection()
-      .filter((p) => conn.hub().getState(p[0]) === 'connecting')
+      .filter((p) => this.ssb.conn.hub().getState(p[0]) === 'connecting')
       .filter((p) => p[1].stateChange! + this.maxWaitToConnect(p) < Date.now())
-      .forEach(([addr]) => conn.disconnect(addr));
-
-    // Purge empty rooms if there are other rooms to try.
-    // The more there are other rooms to try, the shorter the grace period.
-    const otherRooms = conn.query().peersConnectable('db').filter(isRoom);
-    if (otherRooms.length > 0) {
-      const GRACE_PERIOD = (1.5 * MINUTES) / otherRooms.length;
-      conn
-        .query()
-        .peersConnected()
-        .filter(isRoom)
-        .filter(
-          ([, data]) =>
-            data.onlineCount === 0 &&
-            data.hubUpdated! + GRACE_PERIOD < Date.now(),
-        )
-        .forEach(([addr]) => conn.disconnect(addr));
-    }
-
-    // Purge non-room connections to create rotation for others.
-    // The more staged peers there are available, the shorter the grace period.
-    const staged = conn.query().peersConnectable('staging');
-    if (staged.length > 0) {
-      const GRACE_PERIOD = (3 * HOUR) / staged.length;
-      conn
-        .query()
-        .peersConnected()
-        .filter(isNotRoom)
-        .filter((p) => p[1].stateChange! + GRACE_PERIOD < Date.now())
-        .forEach(([addr]) => conn.disconnect(addr));
-    }
+      .forEach(([addr]) => this.ssb.conn.disconnect(addr));
   }
 
   private updateNow() {
