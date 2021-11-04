@@ -1,3 +1,12 @@
+# 6.0.0
+
+- Vastly different scheduler behavior:
+  * New cooldown-score system to prioritize which peers to connect to
+  * Connect to hops=`N+1` peers if no hops=`N` peers are online
+  * Implement rotation of peers (every several minutes) to encourage diversity
+  * If using ssb-room-client, we only support `ssb-room-client@>=2.0.0`
+- Remove support for `config.seeds`
+
 # 5.0.0
 
 - Scheduler dropped supports for ssb-friends lower than 5.0
