@@ -96,25 +96,25 @@ Fields marked 🔷 are important and often used, fields marked 🔹 come from CO
 
 🔹 `hubBirth?: number`: Unix timestamp for when this peer was added to ConnHub
 
-🔹 `hubUpdated?: number`: Unix timestamp for when this data object was last updated in ConnHub
+🔹 `hubUpdated?: number`: Unix timestamp for when this data object was last updated in ConnHub, which means the last time it was connected or attempted
 
 🔹 `stagingBirth?: number`: Unix timestamp for when this peer was added to ConnStaging
 
 🔹 `stagingUpdated?: number`: Unix timestamp for when this data object was last updated in ConnStaging
 
-🔹 `autoconnect?: boolean`: indicates whether this peer should be considered for connection in the scheduler
+🔹 `autoconnect?: boolean`: indicates whether this peer should be considered for automatic connection in the scheduler. By the default this field is considered `true` whenever it's undefined, and if you want opt-out of automatic connections for this peer (thus delegating it to a manual choice by the user), then set it to `false`.
 
-🔹 `failure?: number`: typically in ConnDB, this is the number of connection errors since the last successful connection
+🔹 `failure?: number`: typically stored in ConnDB, this is the number of connection errors since the last successful connection
 
-🔹 `duration?: object`: typically in ConnDB, this is a [statistics](https://www.npmjs.com/package/statistics) object to measure the duration of connection with this peer
+🔹 `duration?: object`: typically stored in ConnDB, this is a [statistics](https://www.npmjs.com/package/statistics) object to measure the duration of connection with this peer
 
-🔹 `ping?: object`: typically in ConnDB, this is [statistics](https://www.npmjs.com/package/statistics) object of various ping health measurements
+🔹 `ping?: object`: typically stored in ConnDB, this is [statistics](https://www.npmjs.com/package/statistics) object of various ping health measurements
 
 🔹 `pool?: 'db' | 'hub' | 'staging'`: this only appears in ConnQuery APIs, and indicates from which pool (ConnDB or ConnHub or ConnStaging) was this peer picked
 
 🔸 `name?: string`: a nickname for this peer, when there isn't an [ssb-about](https://github.com/ssbc/ssb-about) name
 
-🔸 `room?: string`: (only if `type = 'room-endpoint'`) the public key of the [room](https://github.com/staltz/ssb-room) server where this peer is in
+🔸 `room?: string`: (only if `type = 'room-attendant'`) the public key of the [room](https://github.com/staltz/ssb-room) server where this peer is in
 
 🔸 `onlineCount?: number`: (only if `type = 'room'`) the number of room endpoints currently connected to this room
 
@@ -283,22 +283,27 @@ The default scheduler is roughly the same as the legacy ssb-gossip plugin, with 
 - Read the SSB log and look for "pub" messages, and `remember` them
 - Listen to a stream of LAN peers (see [ssb-lan](https://github.com/staltz/ssb-lan)), and `stage` them
 - Listen to a stream of Bluetooth nearby devices, and `stage` them
+- Listen to a stream of peers online in Rooms, and `stage` them
 
 **Periodic connections/disconnections:**
 
-- With (5sec) exponential backoff, try to connect to at most 5 room servers
-- With (10sec) exponential backoff, try to connect to at most 2 non-room peers that we have connected successfully before
-- With (30sec) exponential backoff, try to connect to at most 2 non-room peers that we have never with connected before
-- With (1min) exponential backoff, try to connect to at most 3 non-room peers that have we always failed to connect with
-- With (4min) exponential backoff, try to connect to at most 1 non-room peer that seem to run a legacy version of the gossip plugin
+- Try to maintain connections with 5 room servers
+  - If we're connected to more than 5, then after some minutes we'll start disconnecting from some rooms
+- Try to maintain connections with 4 non-room peers (pubs, room attendants, LAN peers, etc)
+  - If we're connected to more than 4, then after some minutes we'll start disconnecting from some
+  - The lower the hops distance of the peer, the higher priority they receive
+  - The more connection failures the peer has presented, the lower the priority
+  - Room attendants and LAN peers have slight priority over pubs
+  - After we've been connected to a peer for many minutes, disconnect from them
+    and try to connect to different peers, to encourage diversity of connections
 
 In none of the cases above shall we connect to a peer that we block. In addition to the above, the following actions happen automatically every (approximately) 1 second:
 
-- Connect to (at most 3) staged peers we follow
 - Disconnect from connected peers that have just been blocked by us
 - Disconnect from peers that have been connected with us for more than 30min
 - Disconnect from peers that have been pending in "connecting" status for too long
   - "Too long" means 30sec for LAN peers
+  - "Too long" means 30sec for Room attendants
   - "Too long" means 1min for Bluetooth peers
   - "Too long" means 5min for DHT invite peers
   - For other types of peers, "too long" means 10sec
@@ -312,6 +317,7 @@ In none of the cases above shall we connect to a peer that we block. In addition
 Upon starting the scheduler:
 
 - Remove database entries for any LAN or Bluetooth peers (these are rediscovered just-in-time)
+- Remove room alias addresses if those aliases are in rooms where I have membership
 
 **Other events:**
 
@@ -393,7 +399,7 @@ The objectives with CONN were to:
 - Untangle the codebase into modular components with single responsibilities
 - Standardize the assumption that addresses are always multiserver addresses
 - All "pools" (DB, Hub, Staging) are key-value pairs `[address, dataObject]`
-- Make scheduling easily customizable but provide an opinionated default
+- Make scheduling logic easily swappable but provide an opinionated default
 
 <ul></ul>
 
