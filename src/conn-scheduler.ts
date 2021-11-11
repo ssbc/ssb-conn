@@ -136,12 +136,8 @@ function calculateCooldown(
       const hopsCooldown =
         peerType === 'room' // room is always considered at a constant distance
           ? 1 * SECONDS
-          : hop === -1
+          : hop === null || hop === void 0 || hop < 0
           ? Infinity
-          : hop === null || hop === void 0
-          ? 30 * SECONDS
-          : hop < 0
-          ? -hop * 5 * SECONDS
           : hop * SECONDS;
 
       // The more connection failures happened, the longer the cooldown is
