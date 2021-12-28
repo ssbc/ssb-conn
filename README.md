@@ -54,6 +54,8 @@ Now you should be able to access the muxrpc APIs under `ssb.conn` and `ssb.gossi
 
 You can call any of these APIs in your local peer.
 
+This uses [multiserver](https://github.com/ssb-js/multiserver) addresses.
+
 | API | Type | Description |
 |-----|------|-------------|
 | **`ssb.conn.connect(addr, data?, cb)`** | `async` | Connects to a peer known by its multiserver address `addr`, and stores additional optional `data` (as an object) during its connection lifespan. |
