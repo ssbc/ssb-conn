@@ -42,7 +42,7 @@
     "cont": "^1.0.3",
     "secret-stack": "^6.4.0",
     "ssb-caps": "~1.1.0",
-    "ssb-db2": "~2.1.2",
+    "ssb-db2": "~5.0.0",
     "ssb-lan": "~1.0.0",
     "ssb-server": "~16.0.1",
     "tap-arc": "^0.3.5",

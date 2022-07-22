@@ -630,8 +630,8 @@ export class ConnScheduler {
     // Upon init, purge some undesired DB entries
     this.cleanUpDB();
 
-    this.ssbDB2Subscription = this.ssb.db?.post((msg: Msg) => {
-      if (msg.value.author !== this.ssb.id) {
+    this.ssbDB2Subscription = this.ssb.db?.onMsgAdded?.(({kvt}: {kvt: Msg}) => {
+      if (kvt.value.author !== this.ssb.id) {
         this.lastMessageAt = Date.now();
       }
     });

@@ -66,7 +66,7 @@ export interface SSB {
     discoveredPeers: () => CallableFunction;
   }>;
   readonly db?: Readonly<{
-    post: (cb: CallableFunction) => CallableFunction;
+    onMsgAdded?: (cb: CallableFunction) => CallableFunction;
     query: (...args: Array<any>) => any;
     operators: Record<string, any>;
   }>;
