@@ -40,9 +40,9 @@ export class CONN {
     const that = this;
     this.ssb.close.hook(function (this: any, fn: Function, args: Array<any>) {
       that.stopScheduler();
-      that._db.close();
       that._hub.close();
       that._staging.close();
+      that._db.close(); // Has to happen last, because Hub / Staging write to it
       return fn.apply(this, args);
     });
   }
@@ -115,16 +115,16 @@ export class CONN {
     const data = (typeof b === 'object' ? b : {}) as any;
 
     this._hub.connect(address, data).then(
-      result => cb?.(null, result),
-      err => cb?.(err),
+      (result) => cb?.(null, result),
+      (err) => cb?.(err),
     );
   };
 
   @muxrpc('async')
   public disconnect = (address: string, cb?: Callback<any>) => {
     this._hub.disconnect(address).then(
-      result => cb?.(null, result),
-      err => cb?.(err),
+      (result) => cb?.(null, result),
+      (err) => cb?.(err),
     );
   };
 
